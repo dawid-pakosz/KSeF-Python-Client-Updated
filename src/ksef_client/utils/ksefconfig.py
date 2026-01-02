@@ -48,7 +48,7 @@ class Config(configparser.ConfigParser):
 
         cert_file = os.path.join(self.config_dir, f'certificates-{self.version}.json')
         if os.path.exists(cert_file):
-            with open(cert_file, 'rt') as fp:
+            with open(cert_file, 'rt', encoding="utf-8") as fp:
                 self.certificates = json.loads(fp.read())
         else:
             self.certificates = []

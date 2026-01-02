@@ -100,7 +100,7 @@ def main():
                     print(f"[OK] Faktura wysłana. Ref: {ref}")
                 elif args.action == "check":
                     status = service.check_invoice_status(args.file)
-                    print(f"Status faktury: {json.dumps(status, indent=2, ensure_ascii=False)}")
+                    print(f"Status faktury: {json.dumps(status, indent=2)}")
                 elif args.action == "upo":
                     path = service.download_upo(args.file)
                     print(f"[OK] UPO pobrane do: {path}")
@@ -110,10 +110,17 @@ def main():
             run_visualization(args.xml, args.lang)
 
     except KSeFError as e:
-        print(f"[!] Błąd KSeF: {e.msg}")
-        if e.text: print(e.text)
+        msg = f"[!] Błąd KSeF: {e.msg}"
+        print(msg.encode(sys.stdout.encoding, errors='replace').decode(sys.stdout.encoding))
+        if e.text: 
+            print(e.text.encode(sys.stdout.encoding, errors='replace').decode(sys.stdout.encoding))
     except Exception as e:
-        print(f"[X] Błąd: {e}")
+        msg = f"[X] Błąd: {e}"
+        # Safe print for Windows consoles
+        try:
+            print(msg)
+        except UnicodeEncodeError:
+            print(msg.encode('ascii', errors='replace').decode('ascii'))
         import traceback
         traceback.print_exc()
 

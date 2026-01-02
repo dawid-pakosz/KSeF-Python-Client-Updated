@@ -57,7 +57,7 @@ class InvoiceService:
         return session
 
     def session_save(self):
-        with open(self.session_file, "wt") as fp:
+        with open(self.session_file, "wt", encoding="utf-8") as fp:
             fp.write(json.dumps(self.session))
 
     def session_open(self):
@@ -181,7 +181,7 @@ class InvoiceService:
                 del self.session['refs'][xml_path]
                 # Save reference info to archives
                 ref_file = os.path.join(self.cfg.storage_dir, "archives", f"{os.path.basename(xml_path)}.ref")
-                with open(ref_file, 'wt') as fp:
+                with open(ref_file, 'wt', encoding="utf-8") as fp:
                     fp.write(json.dumps(data))
                 self.session_save()
             return data
@@ -210,7 +210,7 @@ class InvoiceService:
 
         if response.status_code == 200:
             upo_path = os.path.join(self.cfg.storage_dir, "upo", f"{os.path.basename(xml_path)}.upo.xml")
-            with open(upo_path, 'wt') as fp:
+            with open(upo_path, 'wt', encoding="utf-8") as fp:
                 fp.write(response.text)
             return upo_path
         return None

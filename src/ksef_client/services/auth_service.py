@@ -87,7 +87,7 @@ class AuthService:
             raise Exception(f"Błąd Redeem: {resp.text}")
         
         final_auth = resp.json()
-        with open(self.auth_file, 'wt') as fp:
+        with open(self.auth_file, 'wt', encoding="utf-8") as fp:
             fp.write(json.dumps(final_auth))
         
         return final_auth
@@ -110,7 +110,7 @@ class AuthService:
         if resp.status_code == 200:
             data = resp.json()
             auth.update(data)
-            with open(self.auth_file, 'wt') as fp:
+            with open(self.auth_file, 'wt', encoding="utf-8") as fp:
                 fp.write(json.dumps(auth))
             return auth
         else:
@@ -119,22 +119,22 @@ class AuthService:
     def get_access_token(self):
         if not os.path.exists(self.auth_file):
             return None
-        with open(self.auth_file, 'rt') as fp:
+        with open(self.auth_file, 'rt', encoding="utf-8") as fp:
             auth = json.loads(fp.read())
             return auth.get("accessToken", {}).get("token")
 
     def fetch_certificates(self):
         """Pobiera certyfikaty publiczne z serwerów KSeF."""
-        print(f"📥 Pobieranie certyfikatów publicznych dla środowiska: {self.cfg.version}...")
+        print(f">>> Pobieranie certyfikatów publicznych dla środowiska: {self.cfg.version}...")
         resp = requests.get(
             f"{self.cfg.url}/api/v2/security/public-key-certificates",
             timeout=10
         )
         if resp.status_code == 200:
             cert_file = os.path.join(self.cfg.config_dir, f'certificates-{self.cfg.version}.json')
-            with open(cert_file, 'wt') as fp:
+            with open(cert_file, 'wt', encoding="utf-8") as fp:
                 fp.write(json.dumps(resp.json(), indent=2))
-            print(f"✅ Certyfikaty zapisane w: {cert_file}")
+            print(f"[OK] Certyfikaty zapisane w: {cert_file}")
             return True
         else:
             raise Exception(f"Błąd pobierania certyfikatów: {resp.status_code} - {resp.text}")
