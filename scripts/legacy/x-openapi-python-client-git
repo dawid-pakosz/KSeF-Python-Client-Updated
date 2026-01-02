@@ -1,0 +1,6 @@
+#!/bin/bash
+rm -rf ksefproject
+vpython3 x-openapi-python-client-git.py \
+generate \
+--path open-api.json \
+--config ksef.yaml

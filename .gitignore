@@ -1,0 +1,25 @@
+__pycache__/
+.venv/
+.idea/
+.vscode/
+
+# Private config & secrets
+config/*.json
+config/*.p12
+config/*.pem
+config/*.key.pem
+config/certificates-*.json
+
+# Storage & generated files
+storage/archives/
+storage/upo/
+storage/output/
+*.zip
+
+# Keep project config but ignore personal overrides if needed
+# config/ksef.ini
+# config/ksef.yaml
+
+# Legacy
+openapi_python_client_old/
+andesive
