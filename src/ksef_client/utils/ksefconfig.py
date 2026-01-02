@@ -9,15 +9,17 @@ import configparser
 
 from cryptography import x509
 
+from pathlib import Path
+
 class Config(configparser.ConfigParser):
     def __init__(self, firma:int=1, osoba:bool=False, initialize:bool=False):
         super().__init__()
         
         # Get project root (2 levels up from src/ksef_client/utils)
-        self.project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-        self.config_dir = os.path.join(self.project_root, 'config')
-        self.storage_dir = os.path.join(self.project_root, 'storage')
-        self.resources_dir = os.path.join(self.project_root, 'resources')
+        self.project_root = Path(__file__).parent.parent.parent.parent.absolute()
+        self.config_dir = self.project_root / 'config'
+        self.storage_dir = self.project_root / 'storage'
+        self.resources_dir = self.project_root / 'resources'
         
         ini_path = os.path.join(self.config_dir, 'ksef.ini')
         self.read(ini_path)

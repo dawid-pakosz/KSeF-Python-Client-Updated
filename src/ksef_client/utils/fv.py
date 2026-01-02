@@ -95,7 +95,7 @@ class Main:
     def main(self, f1, f2, n):
         for i in range(n):
             path = self.faktura(f1, f2)
-            print(f"✅ Wygenerowano fakturę: {path}")
+            print(f"[OK] Wygenerowano fakturę: {path}")
             if n > 1:
                 time.sleep(2)
 

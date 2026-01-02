@@ -64,27 +64,27 @@ def main():
         if args.command == "init":
             auth = AuthService(cfg)
             auth.fetch_certificates()
-            print("✨ Inicjalizacja zakończona pomyślnie.")
+            print("[OK] Inicjalizacja zakończona pomyślnie.")
             
         elif args.command == "login":
             auth = AuthService(cfg)
-            print("🚀 Rozpoczynam logowanie (InitToken)...")
+            print(">>> Rozpoczynam logowanie (InitToken)...")
             auth.login()
-            print("✅ Zalogowano pomyślnie. Token zapisany.")
+            print("[OK] Zalogowano pomyślnie. Token zapisany.")
             
         elif args.command == "refresh":
             auth = AuthService(cfg)
             new_auth = auth.refresh_token()
-            print("✅ Token odświeżony pomyślnie.")
+            print("[OK] Token odświeżony pomyślnie.")
             
         elif args.command == "session":
             service = InvoiceService(cfg)
             if args.action == "open":
                 ref = service.session_open()
-                print(f"✅ Sesja otwarta: {ref}")
+                print(f"[OK] Sesja otwarta: {ref}")
             elif args.action == "close":
                 service.session_close()
-                print("✅ Sesja zamknięta.")
+                print("[OK] Sesja zamknięta.")
             elif args.action == "status":
                 print(f"Status sesji: {service.session['referenceNumber'] or 'Zamknięta'}")
 
@@ -97,23 +97,23 @@ def main():
                 service = InvoiceService(cfg)
                 if args.action == "send":
                     ref = service.send_invoice(args.file)
-                    print(f"✅ Faktura wysłana. Ref: {ref}")
+                    print(f"[OK] Faktura wysłana. Ref: {ref}")
                 elif args.action == "check":
                     status = service.check_invoice_status(args.file)
                     print(f"Status faktury: {json.dumps(status, indent=2, ensure_ascii=False)}")
                 elif args.action == "upo":
                     path = service.download_upo(args.file)
-                    print(f"✅ UPO pobrane do: {path}")
+                    print(f"[OK] UPO pobrane do: {path}")
 
         elif args.command == "viz":
             from ksef_client.views.ksef_viz import run_visualization
             run_visualization(args.xml, args.lang)
 
     except KSeFError as e:
-        print(f"❌ Błąd KSeF: {e.msg}")
+        print(f"[!] Błąd KSeF: {e.msg}")
         if e.text: print(e.text)
     except Exception as e:
-        print(f"❌ Błąd: {e}")
+        print(f"[X] Błąd: {e}")
         import traceback
         traceback.print_exc()
 
