@@ -18,8 +18,12 @@ Zreorganizowane repozytorium backendowe oparte na wzorcach projektowych "Enterpr
 
 Głównym punktem wejścia jest skrypt `scripts/ksef_tool.py`. Poniżej przykłady użycia:
 
-### 1. Odświeżenie tokena
+### 1. Logowanie i odświeżanie sesji
 ```bash
+# Pełne logowanie (jeśli wracasz po dłuższej przerwie)
+python scripts/ksef_tool.py 1 f login
+
+# Odświeżenie tokena (jeśli sesja jeszcze trwa)
 python scripts/ksef_tool.py 1 f refresh
 ```
 

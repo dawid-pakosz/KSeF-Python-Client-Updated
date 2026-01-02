@@ -17,6 +17,9 @@ def main():
     
     subparsers = parser.add_subparsers(dest="command", help="Dostępne komendy")
 
+    # Command: login
+    subparsers.add_parser("login", help="Pełne logowanie do KSeF (InitToken)")
+
     # Command: refresh
     subparsers.add_parser("refresh", help="Odśwież token uwierzytelniający")
 
@@ -39,7 +42,13 @@ def main():
     try:
         cfg = Config(args.firma, args.osoba == 'o')
         
-        if args.command == "refresh":
+        if args.command == "login":
+            auth = AuthService(cfg)
+            print("🚀 Rozpoczynam logowanie (InitToken)...")
+            auth.login()
+            print("✅ Zalogowano pomyślnie. Token zapisany.")
+            
+        elif args.command == "refresh":
             auth = AuthService(cfg)
             new_auth = auth.refresh_token()
             print("✅ Token odświeżony pomyślnie.")
