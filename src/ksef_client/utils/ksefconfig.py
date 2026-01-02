@@ -21,7 +21,12 @@ class Config(configparser.ConfigParser):
         self.storage_dir = self.project_root / 'storage'
         self.resources_dir = self.project_root / 'resources'
         
-        ini_path = os.path.join(self.config_dir, 'ksef.ini')
+        # Ensure directories exist
+        for d in [self.config_dir, self.storage_dir, self.resources_dir, 
+                  self.storage_dir / 'archives', self.storage_dir / 'upo', self.storage_dir / 'output']:
+            d.mkdir(parents=True, exist_ok=True)
+            
+        ini_path = self.config_dir / 'ksef.ini'
         self.read(ini_path)
 
         self.firma = firma
