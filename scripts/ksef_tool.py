@@ -17,6 +17,9 @@ def main():
     
     subparsers = parser.add_subparsers(dest="command", help="Dostępne komendy")
 
+    # Command: init
+    subparsers.add_parser("init", help="Wstępna konfiguracja (pobieranie certyfikatów KSeF)")
+
     # Command: login
     subparsers.add_parser("login", help="Pełne logowanie do KSeF (InitToken)")
 
@@ -40,9 +43,14 @@ def main():
     args = parser.parse_args()
     
     try:
-        cfg = Config(args.firma, args.osoba == 'o')
+        cfg = Config(args.firma, args.osoba == 'o', initialize=True)
         
-        if args.command == "login":
+        if args.command == "init":
+            auth = AuthService(cfg)
+            auth.fetch_certificates()
+            print("✨ Inicjalizacja zakończona pomyślnie.")
+            
+        elif args.command == "login":
             auth = AuthService(cfg)
             print("🚀 Rozpoczynam logowanie (InitToken)...")
             auth.login()

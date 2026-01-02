@@ -122,3 +122,19 @@ class AuthService:
         with open(self.auth_file, 'rt') as fp:
             auth = json.loads(fp.read())
             return auth.get("accessToken", {}).get("token")
+
+    def fetch_certificates(self):
+        """Pobiera certyfikaty publiczne z serwerów KSeF."""
+        print(f"📥 Pobieranie certyfikatów publicznych dla środowiska: {self.cfg.version}...")
+        resp = requests.get(
+            f"{self.cfg.url}/api/v2/security/public-key-certificates",
+            timeout=10
+        )
+        if resp.status_code == 200:
+            cert_file = os.path.join(self.cfg.config_dir, f'certificates-{self.cfg.version}.json')
+            with open(cert_file, 'wt') as fp:
+                fp.write(json.dumps(resp.json(), indent=2))
+            print(f"✅ Certyfikaty zapisane w: {cert_file}")
+            return True
+        else:
+            raise Exception(f"Błąd pobierania certyfikatów: {resp.status_code} - {resp.text}")

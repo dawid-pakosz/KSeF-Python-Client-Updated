@@ -18,9 +18,15 @@ Zreorganizowane repozytorium backendowe oparte na wzorcach projektowych "Enterpr
 
 Głównym punktem wejścia jest skrypt `scripts/ksef_tool.py`. Poniżej przykłady użycia:
 
+### 0. Pierwsze uruchomienie (Inicjalizacja)
+Musisz najpierw pobrać certyfikaty publiczne KSeF:
+```bash
+python scripts/ksef_tool.py 1 f init
+```
+
 ### 1. Logowanie i odświeżanie sesji
 ```bash
-# Pełne logowanie (jeśli wracasz po dłuższej przerwie)
+# Pełne logowanie 
 python scripts/ksef_tool.py 1 f login
 
 # Odświeżenie tokena (jeśli sesja jeszcze trwa)
