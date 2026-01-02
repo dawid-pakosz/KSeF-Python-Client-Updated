@@ -32,8 +32,24 @@ def main():
 
     # Command: invoice
     invoice_parser = subparsers.add_parser("invoice", help="Operacje na fakturach")
-    invoice_parser.add_argument("action", choices=["send", "check", "upo"], help="Akcja")
-    invoice_parser.add_argument("file", help="Plik XML faktury")
+    invoice_subparsers = invoice_parser.add_subparsers(dest="action", help="Dostępne akcje")
+    
+    # Action: generate
+    gen_parser = invoice_subparsers.add_parser("generate", help="Generuj testową fakturę XML")
+    gen_parser.add_argument("odbiorca", type=int, help="Numer firmy odbiorcy (z ksef.ini)")
+    gen_parser.add_argument("--count", type=int, default=1, help="Liczba faktur")
+
+    # Action: send
+    send_parser = invoice_subparsers.add_parser("send", help="Wyślij fakturę")
+    send_parser.add_argument("file", help="Plik XML")
+
+    # Action: check
+    check_parser = invoice_subparsers.add_parser("check", help="Sprawdź status")
+    check_parser.add_argument("file", help="Plik XML")
+
+    # Action: upo
+    upo_parser = invoice_subparsers.add_parser("upo", help="Pobierz UPO")
+    upo_parser.add_argument("file", help="Plik XML")
 
     # Command: viz
     viz_parser = subparsers.add_parser("viz", help="Wizualizacja faktury")
@@ -73,16 +89,21 @@ def main():
                 print(f"Status sesji: {service.session['referenceNumber'] or 'Zamknięta'}")
 
         elif args.command == "invoice":
-            service = InvoiceService(cfg)
-            if args.action == "send":
-                ref = service.send_invoice(args.file)
-                print(f"✅ Faktura wysłana. Ref: {ref}")
-            elif args.action == "check":
-                status = service.check_invoice_status(args.file)
-                print(f"Status faktury: {json.dumps(status, indent=2, ensure_ascii=False)}")
-            elif args.action == "upo":
-                path = service.download_upo(args.file)
-                print(f"✅ UPO pobrane do: {path}")
+            if args.action == "generate":
+                from ksef_client.utils.fv import Main as FVGenerator
+                cfg2 = Config(args.odbiorca, False, initialize=True)
+                FVGenerator().main(cfg, cfg2, args.count)
+            else:
+                service = InvoiceService(cfg)
+                if args.action == "send":
+                    ref = service.send_invoice(args.file)
+                    print(f"✅ Faktura wysłana. Ref: {ref}")
+                elif args.action == "check":
+                    status = service.check_invoice_status(args.file)
+                    print(f"Status faktury: {json.dumps(status, indent=2, ensure_ascii=False)}")
+                elif args.action == "upo":
+                    path = service.download_upo(args.file)
+                    print(f"✅ UPO pobrane do: {path}")
 
         elif args.command == "viz":
             from ksef_client.views.ksef_viz import run_visualization

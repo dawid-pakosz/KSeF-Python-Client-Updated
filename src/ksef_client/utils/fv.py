@@ -18,7 +18,8 @@ class Main:
         vvat = vnetto * vpvat / 100.0
         vbrutto = vnetto + vvat
 
-        data = '''\
+        # ... (XML template remains same) ...
+        data = f'''\
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <Faktura
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -27,23 +28,23 @@ class Main:
   <Naglowek>
     <KodFormularza kodSystemowy="FA (3)" wersjaSchemy="1-0E">FA</KodFormularza>
     <WariantFormularza>3</WariantFormularza>
-    <DataWytworzeniaFa>{datawytworzenia}</DataWytworzeniaFa>
+    <DataWytworzeniaFa>{now.isoformat()}</DataWytworzeniaFa>
     <SystemInfo>eRTa 11.10</SystemInfo>
   </Naglowek>
   <Podmiot1>
     <DaneIdentyfikacyjne>
-      <NIP>{snip}</NIP>
-      <Nazwa>{snazwa}</Nazwa>
+      <NIP>{f1.nip}</NIP>
+      <Nazwa>{f1.nazwa}</Nazwa>
     </DaneIdentyfikacyjne>
     <Adres>
       <KodKraju>PL</KodKraju>
-      <AdresL1>{sadres}</AdresL1>
+      <AdresL1>{f1.adres}</AdresL1>
     </Adres>
   </Podmiot1>
   <Podmiot2>
     <DaneIdentyfikacyjne>
-      <NIP>{dnip}</NIP>
-      <Nazwa>{dnazwa}</Nazwa>
+      <NIP>{f2.nip}</NIP>
+      <Nazwa>{f2.nazwa}</Nazwa>
     </DaneIdentyfikacyjne>
     <NrKlienta>2</NrKlienta>
     <JST>2</JST>
@@ -51,7 +52,7 @@ class Main:
   </Podmiot2>
   <Fa>
     <KodWaluty>PLN</KodWaluty>
-    <P_1>{rmd}</P_1>
+    <P_1>{now.strftime('%Y-%m-%d')}</P_1>
     <P_1M>dom</P_1M>
     <P_2>{serial}</P_2>
     <P_13_1>{vnetto:.2f}</P_13_1>
@@ -86,29 +87,17 @@ class Main:
   </Fa>
 </Faktura>
 '''
-        data = data.format(
-            datawytworzenia=now.isoformat(),
-            snip=f1.nip, snazwa=f1.nazwa, sadres=f1.adres,
-            dnip=f2.nip, dnazwa=f2.nazwa,
-            rmd=now.strftime('%Y-%m-%d'),
-            serial=serial,
-            vnetto=vnetto,
-            vpvat=vpvat,
-            vvat=vvat,
-            vbrutto=vbrutto,
-            vilosc=vilosc,
-            vcnetto=vcnetto,
-        )
-        open(f'{f1.nip}-{f2.nip}-{serial}.xml', 'wt').write(data)
+        output_file = f1.storage_dir / 'archives' / f'{f1.nip}-{f2.nip}-{serial}.xml'
+        with open(output_file, 'wt', encoding='utf-8') as f:
+            f.write(data)
+        return output_file
 
-    def main(self):
-        from ksefconfig import Config
-        f1 = Config(int(sys.argv[1]))
-        f2 = Config(int(sys.argv[2]))
-        n = int(sys.argv[3])
+    def main(self, f1, f2, n):
         for i in range(n):
-            self.faktura(f1, f2)
-            time.sleep(2)
+            path = self.faktura(f1, f2)
+            print(f"✅ Wygenerowano fakturę: {path}")
+            if n > 1:
+                time.sleep(2)
 
 def main():
     cls = Main()

@@ -33,7 +33,17 @@ python scripts/ksef_tool.py 1 f login
 python scripts/ksef_tool.py 1 f refresh
 ```
 
-### 2. Zarządzanie sesją
+### 2. Generowanie i wysyłka faktur
+Możesz teraz generować testowe faktury bezpośrednio za pomocą narzędzia:
+```bash
+# Generowanie 1 faktury dla odbiorcy (firma nr 2)
+python scripts/ksef_tool.py 1 f invoice generate 2
+
+# Wyślij wygenerowaną fakturę (plik znajdziesz w storage/archives/)
+python scripts/ksef_tool.py 1 f invoice send storage/archives/9999999999-1234567890-XXXXXXXX.xml
+```
+
+### 3. Zarządzanie sesją
 ```bash
 python scripts/ksef_tool.py 1 f session open
 python scripts/ksef_tool.py 1 f session status
