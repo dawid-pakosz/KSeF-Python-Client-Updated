@@ -8,7 +8,6 @@ import base64
 import configparser
 
 from cryptography import x509
-
 from pathlib import Path
 
 class Config(configparser.ConfigParser):
@@ -21,12 +20,24 @@ class Config(configparser.ConfigParser):
         self.storage_dir = self.project_root / 'storage'
         self.resources_dir = self.project_root / 'resources'
         
+        # New structured storage paths
+        self.sent_dir = self.storage_dir / 'sent'
+        self.received_dir = self.storage_dir / 'received'
+        self.reports_dir = self.storage_dir / 'reports'
+        
         # Ensure directories exist
-        for d in [self.config_dir, self.storage_dir, self.resources_dir, 
-                  self.storage_dir / 'archives', self.storage_dir / 'upo', 
-                  self.storage_dir / 'output', self.storage_dir / 'inbox']:
+        dirs_to_create = [
+            self.config_dir, self.storage_dir, self.resources_dir,
+            self.sent_dir / 'xml', self.sent_dir / 'upo', self.sent_dir / 'viz',
+            self.received_dir / 'xml', self.received_dir / 'viz',
+            self.reports_dir
+        ]
+        for d in dirs_to_create:
             d.mkdir(parents=True, exist_ok=True)
-            
+            # Create .gitkeep in each leaf directory
+            if not any(item for item in d.iterdir() if item.name != '.gitkeep'):
+                (d / '.gitkeep').touch()
+                
         ini_path = self.config_dir / 'ksef.ini'
         self.read(ini_path)
 
@@ -56,6 +67,19 @@ class Config(configparser.ConfigParser):
 
         if not initialize:
             assert self.nip and self.pesel
+
+    @property
+    def sent_xml(self): return self.sent_dir / 'xml'
+    @property
+    def sent_upo(self): return self.sent_dir / 'upo'
+    @property
+    def sent_viz(self): return self.sent_dir / 'viz'
+    @property
+    def received_xml(self): return self.received_dir / 'xml'
+    @property
+    def received_viz(self): return self.received_dir / 'viz'
+    @property
+    def reports(self): return self.reports_dir
 
     def loadcertificate(self, cert_data):
         cert_bytes = base64.b64decode(cert_data)

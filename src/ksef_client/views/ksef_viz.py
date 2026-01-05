@@ -94,10 +94,16 @@ def run_visualization(xml_path, lang="pl", output=None, ksef_no=None):
             qr_html = f'<div style="text-align: right; margin-bottom: 20px;"><img src="data:image/png;base64,{qr_base64}" alt="KSeF QR Code" /><br/><small>Weryfikacja KSeF</small></div>'
             html_content = html_content.replace("<body>", f"<body>{qr_html}") if "<body>" in html_content else f"{qr_html}{html_content}"
                 
-        output_path = output if output else xml_path + ".html"
-        # Ensure output is in storage/output
-        if not output and not os.path.isabs(output_path):
-            output_path = os.path.join(cfg.storage_dir, "output", os.path.basename(output_path))
+        output_path = output
+        if not output_path:
+            filename = os.path.basename(xml_path) + ".html"
+            # Smart output directory detection
+            if "sent" in str(xml_path).lower():
+                output_path = os.path.join(cfg.sent_viz, filename)
+            elif "received" in str(xml_path).lower():
+                output_path = os.path.join(cfg.received_viz, filename)
+            else:
+                output_path = os.path.join(cfg.reports, filename)
 
         with open(output_path, "w", encoding="utf-8") as f:
             if not html_content.strip().startswith("<!DOCTYPE"):

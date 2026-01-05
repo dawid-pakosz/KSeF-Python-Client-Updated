@@ -179,8 +179,8 @@ class InvoiceService:
             data = response.json()
             if data['status']['code'] == 200:
                 del self.session['refs'][xml_path]
-                # Save reference info to archives
-                ref_file = os.path.join(self.cfg.storage_dir, "archives", f"{os.path.basename(xml_path)}.ref")
+                # Save reference info to sent/xml folder
+                ref_file = self.cfg.sent_xml / f"{os.path.basename(xml_path)}.ref"
                 with open(ref_file, 'wt', encoding="utf-8") as fp:
                     fp.write(json.dumps(data))
                 self.session_save()
@@ -188,14 +188,14 @@ class InvoiceService:
         return None
 
     def download_upo(self, xml_path):
-        ref_file = os.path.join(self.cfg.storage_dir, "archives", f"{os.path.basename(xml_path)}.ref")
+        ref_file = self.cfg.sent_xml / f"{os.path.basename(xml_path)}.ref"
         if not os.path.exists(ref_file):
             # Try to get status first?
             data = self.check_invoice_status(xml_path)
             if not data or data['status']['code'] != 200:
                 raise KSeFError("Invoice not accepted yet or missing reference.")
         else:
-            with open(ref_file, 'rt') as fp:
+            with open(ref_file, 'rt', encoding="utf-8") as fp:
                 data = json.loads(fp.read())
 
         upo_url = data.get('upoDownloadUrl')
@@ -209,8 +209,8 @@ class InvoiceService:
             response = requests.get(upo_url)
 
         if response.status_code == 200:
-            upo_path = os.path.join(self.cfg.storage_dir, "upo", f"{os.path.basename(xml_path)}.upo.xml")
+            upo_path = self.cfg.sent_upo / f"{os.path.basename(xml_path)}.upo.xml"
             with open(upo_path, 'wt', encoding="utf-8") as fp:
                 fp.write(response.text)
-            return upo_path
+            return str(upo_path)
         return None

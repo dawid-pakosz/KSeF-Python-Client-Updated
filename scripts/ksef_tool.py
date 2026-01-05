@@ -53,9 +53,9 @@ def main():
     upo_parser.add_argument("file", help="Plik XML")
 
     # Action: list
-    list_parser = invoice_subparsers.add_parser("list", help="Listuj faktury zakupowe (Subject2)")
+    list_parser = invoice_subparsers.add_parser("list", help="Listuj faktury (metadane)")
     list_parser.add_argument("--days", type=int, default=30, help="Liczba dni wstecz")
-    list_parser.add_argument("--type", choices=["Subject1", "Subject2"], default="Subject2", help="Typ (S1=Sprzedaż, S2=Zakup)")
+    list_parser.add_argument("--type", choices=["Subject1", "Subject2"], default="Subject2", help="Typ (S1=Twoja Sprzedaż, S2=Twój Zakup)")
 
     # Action: fetch
     fetch_parser = invoice_subparsers.add_parser("fetch", help="Pobierz fakturę XML po numerze KSeF")
@@ -64,7 +64,7 @@ def main():
     # Action: export
     export_parser = invoice_subparsers.add_parser("export", help="Eksportuj zestawienie faktur do Excela")
     export_parser.add_argument("--days", type=int, default=30, help="Liczba dni wstecz")
-    export_parser.add_argument("--type", choices=["Subject1", "Subject2"], default="Subject2", help="Typ (S1=Sprzedaż, S2=Zakup)")
+    export_parser.add_argument("--type", choices=["Subject1", "Subject2"], default="Subject2", help="Typ (S1=Twoja Sprzedaż, S2=Twój Zakup)")
 
     # Command: viz
     viz_parser = subparsers.add_parser("viz", help="Wizualizacja faktury")
@@ -153,7 +153,7 @@ def main():
                         print("[!] Brak faktur do wyeksportowania.")
                     else:
                         filename = f"zestawienie_{args.type}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-                        output_path = cfg.storage_dir / "output" / filename
+                        output_path = cfg.reports / filename
                         path = es.export_to_excel(invoices, str(output_path))
                         print(f"[OK] Zestawienie zapisane w: {path}")
 

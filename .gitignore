@@ -11,7 +11,8 @@ config/*.key.pem
 config/certificates-*.json
 
 # Storage & generated files
-storage/**/*
+storage/**
+!storage/**/
 !storage/**/.gitkeep
 *.zip
 

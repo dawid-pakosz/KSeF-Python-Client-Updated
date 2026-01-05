@@ -87,7 +87,7 @@ class QueryService:
         if resp.status_code != 200:
             raise KSeFError(f"Error downloading invoice {ksef_number}: {resp.status_code}", resp.text)
         
-        output_path = self.cfg.storage_dir / "inbox" / f"{ksef_number}.xml"
+        output_path = self.cfg.received_xml / f"{ksef_number}.xml"
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(resp.text)
             
