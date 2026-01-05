@@ -2,6 +2,7 @@ import sys
 import os
 import argparse
 import json
+import datetime
 
 # Add src to path so we can import ksef_client
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
@@ -50,6 +51,20 @@ def main():
     # Action: upo
     upo_parser = invoice_subparsers.add_parser("upo", help="Pobierz UPO")
     upo_parser.add_argument("file", help="Plik XML")
+
+    # Action: list
+    list_parser = invoice_subparsers.add_parser("list", help="Listuj faktury zakupowe (Subject2)")
+    list_parser.add_argument("--days", type=int, default=30, help="Liczba dni wstecz")
+    list_parser.add_argument("--type", choices=["Subject1", "Subject2"], default="Subject2", help="Typ (S1=Sprzedaż, S2=Zakup)")
+
+    # Action: fetch
+    fetch_parser = invoice_subparsers.add_parser("fetch", help="Pobierz fakturę XML po numerze KSeF")
+    fetch_parser.add_argument("ksef_number", help="Numer KSeF faktury")
+
+    # Action: export
+    export_parser = invoice_subparsers.add_parser("export", help="Eksportuj zestawienie faktur do Excela")
+    export_parser.add_argument("--days", type=int, default=30, help="Liczba dni wstecz")
+    export_parser.add_argument("--type", choices=["Subject1", "Subject2"], default="Subject2", help="Typ (S1=Sprzedaż, S2=Zakup)")
 
     # Command: viz
     viz_parser = subparsers.add_parser("viz", help="Wizualizacja faktury")
@@ -104,6 +119,43 @@ def main():
                 elif args.action == "upo":
                     path = service.download_upo(args.file)
                     print(f"[OK] UPO pobrane do: {path}")
+                elif args.action == "list":
+                    from ksef_client.services.query_service import QueryService
+                    qs = QueryService(cfg)
+                    print(f">>> Pobieranie listy faktur ({args.type}, {args.days} dni)...")
+                    invoices = qs.list_invoices(args.days, args.type)
+                    print(f"Znaleziono {len(invoices)} faktur:")
+                    for inv in invoices:
+                        ksef = inv.get('ksefNumber', 'Brak numeru')
+                        date = inv.get('invoicingDate', inv.get('acquisitionTimestamp', 'Brak daty'))
+                        amount = inv.get('grossAmount', '0.00')
+                        
+                        # Try to find any name and NIP in various possible fields
+                        subject = inv.get('subjectBy') or inv.get('issuedBy') or inv.get('receivedBy') or {}
+                        name = subject.get('name') or subject.get('fullName') or 'Brak nazwy'
+                        nip = subject.get('identifier', {}).get('value', 'Brak NIP')
+                        
+                        print(f"- {ksef} | {date} | {nip} - {name} | {amount} PLN")
+                elif args.action == "fetch":
+                    from ksef_client.services.query_service import QueryService
+                    qs = QueryService(cfg)
+                    print(f">>> Pobieranie faktury {args.ksef_number}...")
+                    path = qs.download_invoice(args.ksef_number)
+                    print(f"[OK] Faktura zapisana w: {path}")
+                elif args.action == "export":
+                    from ksef_client.services.query_service import QueryService
+                    from ksef_client.services.export_service import ExportService
+                    qs = QueryService(cfg)
+                    es = ExportService(cfg)
+                    print(f">>> Pobieranie danych do eksportu ({args.type}, {args.days} dni)...")
+                    invoices = qs.list_invoices(args.days, args.type)
+                    if not invoices:
+                        print("[!] Brak faktur do wyeksportowania.")
+                    else:
+                        filename = f"zestawienie_{args.type}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                        output_path = cfg.storage_dir / "output" / filename
+                        path = es.export_to_excel(invoices, str(output_path))
+                        print(f"[OK] Zestawienie zapisane w: {path}")
 
         elif args.command == "viz":
             from ksef_client.views.ksef_viz import run_visualization

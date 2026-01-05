@@ -43,7 +43,20 @@ python scripts/ksef_tool.py 1 f invoice generate 2
 python scripts/ksef_tool.py 1 f invoice send storage/archives/9999999999-1234567890-XXXXXXXX.xml
 ```
 
-### 3. Zarządzanie sesją
+### 3. Pobieranie faktur (Zakup/Sprzedaż)
+Możesz listować i pobierać faktury, które zostały wystawione na Twój NIP przez innych dostawców:
+```bash
+# Listuj faktury zakupowe (Subject2) z ostatnich 30 dni
+python scripts/ksef_tool.py 1 f invoice list
+
+# Pobierz konkretną fakturę do storage/inbox/
+python scripts/ksef_tool.py 1 f invoice fetch 9999999999-20240105-XXXXXXXXXXXX-XX
+
+# Eksportuj zestawienie do Excela
+python scripts/ksef_tool.py 1 f invoice export --type Subject1 --days 30
+```
+
+### 4. Zarządzanie sesją
 ```bash
 python scripts/ksef_tool.py 1 f session open
 python scripts/ksef_tool.py 1 f session status

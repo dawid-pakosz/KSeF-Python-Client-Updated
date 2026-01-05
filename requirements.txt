@@ -6,3 +6,5 @@ asn1crypto
 endesive
 python-dateutil
 qrcode[pil]
+pandas
+openpyxl

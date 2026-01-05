@@ -23,7 +23,8 @@ class Config(configparser.ConfigParser):
         
         # Ensure directories exist
         for d in [self.config_dir, self.storage_dir, self.resources_dir, 
-                  self.storage_dir / 'archives', self.storage_dir / 'upo', self.storage_dir / 'output']:
+                  self.storage_dir / 'archives', self.storage_dir / 'upo', 
+                  self.storage_dir / 'output', self.storage_dir / 'inbox']:
             d.mkdir(parents=True, exist_ok=True)
             
         ini_path = self.config_dir / 'ksef.ini'

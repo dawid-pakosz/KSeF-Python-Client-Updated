@@ -109,7 +109,13 @@ class AuthService:
 
         if resp.status_code == 200:
             data = resp.json()
-            auth.update(data)
+            # In API v2, refresh usually returns a new accessToken object
+            if "accessToken" in data:
+                auth["accessToken"] = data["accessToken"]
+            else:
+                # Fallback if the whole response is the token object
+                auth["accessToken"] = data
+            
             with open(self.auth_file, 'wt', encoding="utf-8") as fp:
                 fp.write(json.dumps(auth))
             return auth
