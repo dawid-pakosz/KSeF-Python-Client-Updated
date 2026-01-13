@@ -84,6 +84,9 @@ python scripts/ksef_tool.py 1 f viz storage/sent/xml/faktura.xml --lang pl
 
 # Wizualizacja faktury pobranej (zapisana w storage/received/viz/)
 python scripts/ksef_tool.py 1 f viz storage/received/xml/faktura.xml --lang pl
+
+# Dedykowana wizualizacja (motyw corporate)
+python scripts/ksef_tool.py 1 f viz storage/received/xml/faktura.xml --theme corporate --ksef-no 123-ABC-01
 ```
 
 ## Porządki

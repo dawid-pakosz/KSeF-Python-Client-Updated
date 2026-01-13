@@ -155,6 +155,7 @@ def main():
     parser.add_argument("--lang", choices=["pl", "eng"], default="pl", help="Language for visualization")
     parser.add_argument("--output", help="Output HTML file path")
     parser.add_argument("--theme", default="default", help="Visualization theme (default, corporate)")
+    parser.add_argument("--ksef-no", help="KSeF Number (optional)")
     
     args = parser.parse_args()
     run_visualization(args.xml, args.lang, args.output, args.ksef_no, args.theme)
