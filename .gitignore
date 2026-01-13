@@ -23,3 +23,8 @@ storage/**
 # Legacy
 openapi_python_client_old/
 andesive
+
+# Personal notes & Artifacts
+PROJECT_GUIDE.md
+PROJECT_OVERVIEW.md
+walkthrough.md

@@ -87,7 +87,7 @@ class Main:
   </Fa>
 </Faktura>
 '''
-        output_file = f1.storage_dir / 'archives' / f'{f1.nip}-{f2.nip}-{serial}.xml'
+        output_file = f1.sent_xml / f'{f1.nip}-{f2.nip}-{serial}.xml'
         with open(output_file, 'wt', encoding='utf-8') as f:
             f.write(data)
         return output_file
