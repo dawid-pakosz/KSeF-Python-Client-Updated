@@ -49,7 +49,7 @@ def get_qr_base64(xml_bytes, ksef_number=None, base_url="https://ksef-test.mf.go
         print(f"Warning: Could not generate QR code: {e}")
         return None
 
-def run_visualization(xml_path, lang="pl", output=None, ksef_no=None):
+def run_visualization(xml_path, lang="pl", output=None, ksef_no=None, theme="default"):
     if not os.path.exists(xml_path):
         print(f"Error: XML file {xml_path} not found.")
         return False
@@ -65,32 +65,64 @@ def run_visualization(xml_path, lang="pl", output=None, ksef_no=None):
         print("Error: Could not detect Faktura variant.")
         return False
         
-    print(f"Detected FA variant: {wariant}")
+    print(f"Detected FA variant: {wariant} | Theme: {theme} | Lang: {lang}")
     
     # Select stylesheet
     cfg = Config(1)
-    xsl_file = os.path.join(cfg.resources_dir, 'styles', f"styl-fa{wariant}.xsl")
-    if lang == "eng":
-        xsl_file = os.path.join(cfg.resources_dir, 'styles', f"styl-fa{wariant}-eng.xsl")
+    
+    if theme == "corporate":
+        xsl_file = os.path.join(cfg.resources_dir, 'styles', "styl-corporate.xsl")
+    else:
+        # Default mapping
+        if lang == "eng":
+            xsl_file = os.path.join(cfg.resources_dir, 'styles', f"styl-fa{wariant}-eng.xsl")
+        else:
+            xsl_file = os.path.join(cfg.resources_dir, 'styles', f"styl-fa{wariant}.xsl")
         
     if not os.path.exists(xsl_file):
         print(f"Error: Stylesheet {xsl_file} not found.")
         return False
         
-    # Generate QR Code
+    # Generate QR Code and Verification URL
     qr_base64 = get_qr_base64(xml_bytes, ksef_number=ksef_no, base_url=cfg.url)
-    
+    verification_url = ""
+    if qr_base64:
+        # Re-using logic from qr_codes_generator to get the same URL
+        from ..utils import qr_codes_generator
+        try:
+            seller_nip, issue_date = qr_codes_generator.get_seller_nip_and_issue_date_from_invoice_xml_bytes(xml_bytes)
+            invoice_hash = qr_codes_generator.compute_invoice_hash_base64url_from_bytes(xml_bytes)
+            verification_url = qr_codes_generator.build_invoice_verification_url(
+                nip=seller_nip,
+                issue_date=issue_date,
+                invoice_hash_base64url=invoice_hash,
+                base_url=cfg.url
+            )
+        except:
+            pass
+
     # Transform
     try:
         xslt_dom = etree.parse(xsl_file)
         transform = etree.XSLT(xslt_dom)
         
-        # Pass schema-krajow
+        # Prepare parameters for XSLT
+        params = {
+            'lang': etree.XSLT.strparam(lang),
+            'ksef-number': etree.XSLT.strparam(ksef_no or ""),
+            'qr-code-base64': etree.XSLT.strparam(qr_base64 or ""),
+            'verification-url': etree.XSLT.strparam(verification_url),
+        }
+        
+        # Add schema-krajow if needed
         xsd_path = os.path.join(cfg.resources_dir, 'schemas', 'KodyKrajow_v10-0E.xsd')
-        newdom = transform(dom, **{'schema-krajow': etree.XSLT.strparam(xsd_path)})
+        params['schema-krajow'] = etree.XSLT.strparam(xsd_path)
+        
+        newdom = transform(dom, **params)
         html_content = etree.tostring(newdom, pretty_print=True, method="html", encoding="unicode")
         
-        if qr_base64:
+        # Injection logic (for generic templates that don't handle parameters internally)
+        if theme == "default" and qr_base64:
             qr_html = f'<div style="text-align: right; margin-bottom: 20px;"><img src="data:image/png;base64,{qr_base64}" alt="KSeF QR Code" /><br/><small>Weryfikacja KSeF</small></div>'
             html_content = html_content.replace("<body>", f"<body>{qr_html}") if "<body>" in html_content else f"{qr_html}{html_content}"
                 
@@ -122,10 +154,10 @@ def main():
     parser.add_argument("xml", help="Path to the invoice XML file")
     parser.add_argument("--lang", choices=["pl", "eng"], default="pl", help="Language for visualization")
     parser.add_argument("--output", help="Output HTML file path")
-    parser.add_argument("--ksef-no", help="KSeF Number (optional, for labeling)")
+    parser.add_argument("--theme", default="default", help="Visualization theme (default, corporate)")
     
     args = parser.parse_args()
-    run_visualization(args.xml, args.lang, args.output, args.ksef_no)
+    run_visualization(args.xml, args.lang, args.output, args.ksef_no, args.theme)
 
 if __name__ == "__main__":
     main()

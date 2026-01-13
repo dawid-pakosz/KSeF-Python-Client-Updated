@@ -70,6 +70,8 @@ def main():
     viz_parser = subparsers.add_parser("viz", help="Wizualizacja faktury")
     viz_parser.add_argument("xml", help="Plik XML")
     viz_parser.add_argument("--lang", choices=["pl", "eng"], default="pl", help="Język")
+    viz_parser.add_argument("--theme", default="default", help="Motyw wizualizacji (default, corporate)")
+    viz_parser.add_argument("--ksef-no", help="Numer KSeF (opcjonalny)")
 
     args = parser.parse_args()
     
@@ -159,7 +161,7 @@ def main():
 
         elif args.command == "viz":
             from ksef_client.views.ksef_viz import run_visualization
-            run_visualization(args.xml, args.lang)
+            run_visualization(args.xml, args.lang, theme=args.theme, ksef_no=args.ksef_no)
 
     except KSeFError as e:
         msg = f"[!] Błąd KSeF: {e.msg}"
