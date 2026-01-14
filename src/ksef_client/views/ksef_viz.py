@@ -20,6 +20,21 @@ def detect_fa_version(root):
             return wariant.text
     return None
 
+def detect_department(root):
+    """Detects department (CCS/ACC) based on XML content."""
+    namespace = {'ns': root.tag.split('}')[0].strip('{')} if '}' in root.tag else {}
+    # Search in StopkaFaktury for "Customer Contacts" keyword
+    stopka_elems = root.xpath('//ns:Stopka/ns:Informacje/ns:StopkaFaktury/text()', namespaces=namespace)
+    if stopka_elems and any("Customer Contacts" in s for s in stopka_elems):
+        return "CCS"
+    
+    # Also check Rejestry for "Spółka_" pattern often seen in CCS
+    rejestry = root.xpath('//ns:Stopka/ns:Rejestry/ns:PelnaNazwa/text()', namespaces=namespace)
+    if rejestry and any("Spółka_" in r for r in rejestry):
+        return "CCS"
+        
+    return "ACC"
+
 def get_qr_base64(xml_bytes, ksef_number=None, base_url="https://ksef-test.mf.gov.pl"):
     """Generates KSeF QR code and returns it as base64 string."""
     try:
@@ -64,8 +79,20 @@ def run_visualization(xml_path, lang="pl", output=None, ksef_no=None, theme="def
     if not wariant:
         print("Error: Could not detect Faktura variant.")
         return False
-        
-    print(f"Detected FA variant: {wariant} | Theme: {theme} | Lang: {lang}")
+    
+    # Intelligent department detection
+    dept = detect_department(dom)
+    
+    # Auto-switch to English for CCS if it's the default 'pl' and we are using corporate theme
+    effective_lang = lang
+    if theme == "corporate" and dept == "CCS" and lang == "pl":
+        # Check if the invoice is mostly in English (e.g. contains / in headers or currency is not PLN)
+        kod_waluty = dom.xpath('//ns:Fa/ns:KodWaluty/text()', namespaces={'ns': dom.tag.split('}')[0].strip('{')})
+        if kod_waluty and kod_waluty[0] != "PLN":
+            effective_lang = "eng"
+            print(f"Intelligent detection: CCS Department and non-PLN currency detected. Auto-switching to English (eng).")
+
+    print(f"Detected: FA{wariant} | Dept: {dept} | Theme: {theme} | Lang: {effective_lang}")
     
     # Select stylesheet
     cfg = Config(1)
@@ -108,7 +135,7 @@ def run_visualization(xml_path, lang="pl", output=None, ksef_no=None, theme="def
         
         # Prepare parameters for XSLT
         params = {
-            'lang': etree.XSLT.strparam(lang),
+            'lang': etree.XSLT.strparam(effective_lang),
             'ksef-number': etree.XSLT.strparam(ksef_no or ""),
             'qr-code-base64': etree.XSLT.strparam(qr_base64 or ""),
             'verification-url': etree.XSLT.strparam(verification_url),

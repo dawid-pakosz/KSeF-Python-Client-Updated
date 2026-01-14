@@ -67,10 +67,22 @@
             <xsl:otherwise>Adnotacje</xsl:otherwise>
         </xsl:choose>
     </xsl:variable>
-     <xsl:variable name="lbl-additional">
+    <xsl:variable name="lbl-additional">
         <xsl:choose>
-            <xsl:when test="$lang='eng'">Additional Information</xsl:when>
-            <xsl:otherwise>Dodatkowe informacje</xsl:otherwise>
+            <xsl:when test="$lang='eng'">Additional Information / Currency Conversions</xsl:when>
+            <xsl:otherwise>Dodatkowe informacje / Przeliczenia walut</xsl:otherwise>
+        </xsl:choose>
+    </xsl:variable>
+    <xsl:variable name="lbl-footer-contacts">
+        <xsl:choose>
+            <xsl:when test="$lang='eng'">Customer Contacts &amp; Billing Dept</xsl:when>
+            <xsl:otherwise>Kontakt z klientem i Dział Rozliczeń</xsl:otherwise>
+        </xsl:choose>
+    </xsl:variable>
+    <xsl:variable name="lbl-footer-legal">
+        <xsl:choose>
+            <xsl:when test="$lang='eng'">Legal &amp; Registration Information</xsl:when>
+            <xsl:otherwise>Informacje prawne i rejestrowe</xsl:otherwise>
         </xsl:choose>
     </xsl:variable>
 
@@ -320,17 +332,38 @@
                     </div>
                 </xsl:if>
 
-                <!-- Stopka Faktury (Pozostałe informacje) -->
+                <!-- Inteligentna Stopka Faktury -->
                 <xsl:if test="ns:Stopka/ns:Informacje/ns:StopkaFaktury">
                     <div class="section-data">
                         <div class="line-basic"></div>
-                        <span class="section-data__header section-data__header--h1">Pozostałe informacje</span>
-                        <table class="table-basic">
-                            <thead><tr><th class="table-basic__header">Stopka faktury</th></tr></thead>
-                            <tbody>
-                                <tr><td class="table-basic__cell"><pre style="font-family:inherit; white-space: pre-wrap;"><xsl:value-of select="ns:Stopka/ns:Informacje/ns:StopkaFaktury" /></pre></td></tr>
-                            </tbody>
-                        </table>
+                        <xsl:choose>
+                            <!-- Wariant CCS: Wykrywanie po "Customer Contacts" -->
+                            <xsl:when test="contains(ns:Stopka/ns:Informacje/ns:StopkaFaktury, 'Customer Contacts')">
+                                <span class="section-data__header section-data__header--h1"><xsl:value-of select="$lbl-footer-contacts" /></span>
+                                <table class="table-basic">
+                                    <tbody>
+                                        <tr>
+                                            <td class="table-basic__cell" style="background-color: #f8f9fa;">
+                                                <pre style="font-family:'Open Sans', sans-serif; white-space: pre-wrap; margin: 0; font-size: 0.55rem;"><xsl:value-of select="ns:Stopka/ns:Informacje/ns:StopkaFaktury" /></pre>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </xsl:when>
+                            <!-- Wariant ACC / Standard: Pozostałe przypadki -->
+                            <xsl:otherwise>
+                                <span class="section-data__header section-data__header--h1"><xsl:value-of select="$lbl-footer-legal" /></span>
+                                <table class="table-basic">
+                                    <tbody>
+                                        <tr>
+                                            <td class="table-basic__cell">
+                                                <pre style="font-family:'Open Sans', sans-serif; white-space: pre-wrap; margin: 0; font-size: 0.55rem;"><xsl:value-of select="ns:Stopka/ns:Informacje/ns:StopkaFaktury" /></pre>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </xsl:otherwise>
+                        </xsl:choose>
                     </div>
                 </xsl:if>
 
