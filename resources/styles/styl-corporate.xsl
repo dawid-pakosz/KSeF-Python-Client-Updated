@@ -6,13 +6,13 @@
 
     <xsl:output method="html" encoding="UTF-8" indent="yes" />
 
-    <!-- Parameters passed from Python -->
+    <!-- Parametry przekazywane z Pythona -->
     <xsl:param name="lang" select="'pl'" />
     <xsl:param name="ksef-number" select="''" />
     <xsl:param name="qr-code-base64" select="''" />
     <xsl:param name="verification-url" select="''" />
 
-    <!-- Translations -->
+    <!-- Tłumaczenia -->
     <xsl:variable name="lbl-invoice-no">
         <xsl:choose>
             <xsl:when test="$lang='eng'">Invoice Number</xsl:when>
@@ -37,6 +37,12 @@
             <xsl:otherwise>Nabywca</xsl:otherwise>
         </xsl:choose>
     </xsl:variable>
+    <xsl:variable name="lbl-details">
+        <xsl:choose>
+            <xsl:when test="$lang='eng'">Details</xsl:when>
+            <xsl:otherwise>Szczegóły</xsl:otherwise>
+        </xsl:choose>
+    </xsl:variable>
     <xsl:variable name="lbl-issue-date">
         <xsl:choose>
             <xsl:when test="$lang='eng'">Issue Date:</xsl:when>
@@ -47,6 +53,24 @@
         <xsl:choose>
             <xsl:when test="$lang='eng'">Delivery/Execution Date:</xsl:when>
             <xsl:otherwise>Data dokonania/wykonania:</xsl:otherwise>
+        </xsl:choose>
+    </xsl:variable>
+    <xsl:variable name="lbl-summary">
+        <xsl:choose>
+            <xsl:when test="$lang='eng'">Tax Rate Summary</xsl:when>
+            <xsl:otherwise>Podsumowanie stawek podatku</xsl:otherwise>
+        </xsl:choose>
+    </xsl:variable>
+    <xsl:variable name="lbl-adnotacje">
+        <xsl:choose>
+            <xsl:when test="$lang='eng'">Annotations</xsl:when>
+            <xsl:otherwise>Adnotacje</xsl:otherwise>
+        </xsl:choose>
+    </xsl:variable>
+     <xsl:variable name="lbl-additional">
+        <xsl:choose>
+            <xsl:when test="$lang='eng'">Additional Information</xsl:when>
+            <xsl:otherwise>Dodatkowe informacje</xsl:otherwise>
         </xsl:choose>
     </xsl:variable>
 
@@ -68,10 +92,9 @@
                 <div class="main-header">
                     <div class="ksef-title-wrapper">
                         <div class="ksef-title">
-                            E-faktura została wystawiona przy użyciu 
+                            E-faktura wystawiona przy użyciu 
                             <span class="ksef-title--bold">Krajowego Systemu e-Faktur</span>
                             <span class="ksef-title--red"> (KSeF)</span>
-                            zgodnie z obowiązującymi przepisami prawa.
                         </div>
                     </div>
                     <div class="header-info-wrapper">
@@ -81,9 +104,6 @@
                             </span>
                             <span class="label-data-info">
                                 <span class="label-data-info--value2"><xsl:value-of select="ns:Fa/ns:P_2" /></span>
-                            </span>
-                            <span class="label-data-info">
-                                <span class="label-data-info--value">Faktura podstawowa</span>
                             </span>
                             <xsl:if test="$ksef-number != ''">
                                 <span class="label-data-info">
@@ -95,7 +115,7 @@
                     </div>
                 </div>
 
-                <!-- Seller & Buyer -->
+                <!-- Sprzedawca / Nabywca -->
                 <div class="section-data">
                     <div class="line-basic"></div>
                     <div class="section-data__wrapper-left">
@@ -142,10 +162,10 @@
                     </div>
                 </div>
 
-                <!-- Dates -->
+                <!-- Szczegóły -->
                 <div class="section-data">
                     <div class="line-basic"></div>
-                    <span class="section-data__header section-data__header--h1">Szczegóły</span>
+                    <span class="section-data__header section-data__header--h1"><xsl:value-of select="$lbl-details" /></span>
                     <span class="label-data-info label-data-info--half">
                         <span class="label-data-info--name"><xsl:value-of select="$lbl-issue-date" /></span>
                         <span class="label-data-info--value"><xsl:value-of select="ns:Fa/ns:P_1" /></span>
@@ -158,7 +178,7 @@
                     </xsl:if>
                 </div>
 
-                <!-- Items -->
+                <!-- Pozycje -->
                 <div class="section-data">
                     <div class="line-basic"></div>
                     <span class="section-data__header section-data__header--h1">Pozycje</span>
@@ -190,14 +210,135 @@
                     </table>
                     <div class="label-data-info label-data-info--right">
                         <span class="label-data-info--name2">Kwota należności ogółem:</span>
-                        <span class="label-data-info--value2"><xsl:value-of select="ns:Fa/ns:KodWaluty" /><xsl:value-of select="ns:Fa/ns:P_15" /></span>
+                        <span class="label-data-info--value2"><xsl:value-of select="ns:Fa/ns:KodWaluty" /><xsl:text> </xsl:text><xsl:value-of select="ns:Fa/ns:P_15" /></span>
                     </div>
                 </div>
 
-                <!-- Footer / QR -->
+                <!-- Podsumowanie stawek podatku (Re-mapping P_13_x) -->
+                <div class="section-data">
+                    <div class="line-basic"></div>
+                    <span class="section-data__header section-data__header--h1"><xsl:value-of select="$lbl-summary" /></span>
+                    <table class="table-basic">
+                        <thead>
+                            <tr>
+                                <th class="table-basic__header table-basic__header--lp">Lp.</th>
+                                <th class="table-basic__header">Stawka podatku</th>
+                                <th class="table-basic__header">Kwota netto</th>
+                                <th class="table-basic__header">Kwota podatku</th>
+                                <th class="table-basic__header">Kwota brutto</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Przykład dla stawki 23% (P_13_1) -->
+                            <xsl:if test="ns:Fa/ns:P_13_1">
+                                <tr>
+                                    <td class="table-basic__cell">1</td>
+                                    <td class="table-basic__cell">23%</td>
+                                    <td class="table-basic__cell table-basic__cell--to-right"><xsl:value-of select="ns:Fa/ns:P_13_1" /></td>
+                                    <td class="table-basic__cell table-basic__cell--to-right"><xsl:value-of select="ns:Fa/ns:P_14_1" /></td>
+                                    <td class="table-basic__cell table-basic__cell--to-right"><xsl:value-of select="ns:Fa/ns:P_13_1 + ns:Fa/ns:P_14_1" /></td>
+                                </tr>
+                            </xsl:if>
+                            <!-- Przykład dla "np" wyłączenie (P_13_8) -->
+                            <xsl:if test="ns:Fa/ns:P_13_8">
+                                <tr>
+                                    <td class="table-basic__cell">2</td>
+                                    <td class="table-basic__cell">np z wyłączeniem art. 100 ust. 1 pkt 4 ustawy</td>
+                                    <td class="table-basic__cell table-basic__cell--to-right"><xsl:value-of select="ns:Fa/ns:P_13_8" /></td>
+                                    <td class="table-basic__cell table-basic__cell--to-right">0.00</td>
+                                    <td class="table-basic__cell table-basic__cell--to-right"><xsl:value-of select="ns:Fa/ns:P_13_8" /></td>
+                                </tr>
+                            </xsl:if>
+                             <!-- Przykład dla "np" na podstawie (P_13_9) -->
+                            <xsl:if test="ns:Fa/ns:P_13_9">
+                                <tr>
+                                    <td class="table-basic__cell">3</td>
+                                    <td class="table-basic__cell">np na podstawie art. 100 ust. 1 pkt 4 ustawy</td>
+                                    <td class="table-basic__cell table-basic__cell--to-right"><xsl:value-of select="ns:Fa/ns:P_13_9" /></td>
+                                    <td class="table-basic__cell table-basic__cell--to-right">0.00</td>
+                                    <td class="table-basic__cell table-basic__cell--to-right"><xsl:value-of select="ns:Fa/ns:P_13_9" /></td>
+                                </tr>
+                            </xsl:if>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Adnotacje -->
+                <div class="section-data">
+                    <div class="line-basic"></div>
+                    <span class="section-data__header section-data__header--h1"><xsl:value-of select="$lbl-adnotacje" /></span>
+                    <div class="section-data__divide-lr">
+                        <xsl:if test="ns:Fa/ns:Adnotacje/ns:P_16 = 1">
+                            <span class="label-data-info label-data-info--half"><span class="label-data-info--name">Metoda kasowa</span></span>
+                        </xsl:if>
+                        <xsl:if test="ns:Fa/ns:Adnotacje/ns:P_18 = 1">
+                            <span class="label-data-info label-data-info--half"><span class="label-data-info--name">Odwrotne obciążenie</span></span>
+                        </xsl:if>
+                        <xsl:if test="ns:Fa/ns:Adnotacje/ns:P_18A = 1">
+                            <span class="label-data-info label-data-info--half"><span class="label-data-info--name">Mechanizm podzielonej płatności</span></span>
+                        </xsl:if>
+                    </div>
+                </div>
+
+                <!-- Dodatkowe informacje -->
+                <xsl:if test="ns:Fa/ns:DodatkowyOpis">
+                    <div class="section-data">
+                        <div class="line-basic"></div>
+                        <span class="section-data__header section-data__header--h1"><xsl:value-of select="$lbl-additional" /></span>
+                        <table class="table-basic">
+                            <thead>
+                                <tr>
+                                    <th class="table-basic__header table-basic__header--medium-size">Rodzaj informacji</th>
+                                    <th class="table-basic__header">Treść informacji</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <xsl:for-each select="ns:Fa/ns:DodatkowyOpis">
+                                    <tr>
+                                        <td class="table-basic__cell"><xsl:value-of select="ns:Klucz" /></td>
+                                        <td class="table-basic__cell"><xsl:value-of select="ns:Wartosc" /></td>
+                                    </tr>
+                                </xsl:for-each>
+                            </tbody>
+                        </table>
+                    </div>
+                </xsl:if>
+
+                <!-- Rejestry (Stopka) -->
+                <xsl:if test="ns:Stopka/ns:Rejestry">
+                    <div class="section-data">
+                        <div class="line-basic"></div>
+                        <span class="section-data__header section-data__header--h1">Rejestry</span>
+                        <table class="table-basic table-basic--auto">
+                            <thead><tr><th class="table-basic__header">Pełna nazwa</th></tr></thead>
+                            <tbody>
+                                <xsl:for-each select="ns:Stopka/ns:Rejestry">
+                                    <tr><td class="table-basic__cell"><xsl:value-of select="ns:PelnaNazwa" /></td></tr>
+                                </xsl:for-each>
+                            </tbody>
+                        </table>
+                    </div>
+                </xsl:if>
+
+                <!-- Stopka Faktury (Pozostałe informacje) -->
+                <xsl:if test="ns:Stopka/ns:Informacje/ns:StopkaFaktury">
+                    <div class="section-data">
+                        <div class="line-basic"></div>
+                        <span class="section-data__header section-data__header--h1">Pozostałe informacje</span>
+                        <table class="table-basic">
+                            <thead><tr><th class="table-basic__header">Stopka faktury</th></tr></thead>
+                            <tbody>
+                                <tr><td class="table-basic__cell"><pre style="font-family:inherit; white-space: pre-wrap;"><xsl:value-of select="ns:Stopka/ns:Informacje/ns:StopkaFaktury" /></pre></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </xsl:if>
+
+                <!-- Kod QR -->
                 <div class="section-data">
                     <div class="line-basic"></div>
                     <xsl:if test="$qr-code-base64 != ''">
+                         <span class="section-data__header section-data__header--h1">Sprawdź, czy Twoja faktura znajduje się w KSeF!</span>
                          <div class="section-data__qr-wrapper">
                             <img height="207" alt="QR Code" src="data:image/png;base64,{$qr-code-base64}" />
                             <span class="label-data-info label-data-info--height1 label-data-info--text-center">
@@ -206,7 +347,7 @@
                         </div>
                         <div style="float: left; width: 70%;">
                             <div class="label-data-info label-data-info--height2">
-                                <span class="label-data-info--name">Weryfikacja faktury:</span>
+                                <span class="label-data-info--name">Nie możesz zeskanować kodu z obrazka? Kliknij w link i przejdź do weryfikacji!</span>
                             </div>
                             <div class="label-data-info label-data-info--height1">
                                 <span class="label-data-info--value">
