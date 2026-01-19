@@ -23,6 +23,13 @@ class InvoiceService:
         self.cfg = cfg
         self.auth_file = f"{cfg.prefix_full}-auth.json"
         self.session_file = f"{cfg.prefix_full}-session.json"
+
+    def log(self, message, level="INFO"):
+        """Central logging for the service, pipes to config callback if exists."""
+        if hasattr(self.cfg, 'log_callback') and self.cfg.log_callback:
+            self.cfg.log_callback(message, level)
+        else:
+            print(f"[{level}] {message}")
         
         if not os.path.exists(self.auth_file):
             raise KSeFError(f"Missing auth file: {self.auth_file}")
@@ -61,9 +68,11 @@ class InvoiceService:
             fp.write(json.dumps(self.session))
 
     def session_open(self):
+        self.log("Opening new online session with KSeF...")
         _, public_key = self.cfg.getcertificte(False)
         assert isinstance(public_key, rsa.RSAPublicKey)
 
+        self.log("Encrypting symmetric key for session...")
         encrypted_symmetric_key = public_key.encrypt(
             base64.b64decode(self.session['symmetric_key']),
             padding.OAEP(
@@ -85,6 +94,7 @@ class InvoiceService:
             },
         }
 
+        self.log("Sending session opening request...")
         response = requests.post(
             f"{self.cfg.url}/sessions/online",
             json=request_data,
@@ -96,16 +106,19 @@ class InvoiceService:
             raise KSeFError('Error opening session.', response.text)
 
         data = response.json()
-        self.session["referenceNumber"] = data["referenceNumber"]
+        ref_no = data["referenceNumber"]
+        self.session["referenceNumber"] = ref_no
         self.session["validUntil"] = data["validUntil"]
         self.session_save()
-        return data["referenceNumber"]
+        self.log(f"✅ Session established. Reference: {ref_no}")
+        return ref_no
 
     def session_close(self):
         ref = self.session.get("referenceNumber")
         if not ref:
             return
 
+        self.log(f"Closing session {ref}...")
         requests.post(
             f'{self.cfg.url}/sessions/online/{ref}/close',
             headers={"Authorization": f"Bearer {self.access_token}"},
@@ -134,9 +147,11 @@ class InvoiceService:
         if not self.session.get("referenceNumber"):
             raise KSeFError("Session not open")
 
+        self.log(f"Preparing invoice: {os.path.basename(xml_path)}...")
         with open(xml_path, "rb") as f:
             invoice_xml = f.read()
 
+        self.log("Encrypting invoice content (AES)...")
         encrypted_invoice = self._encrypt_invoice(invoice_xml)
         invoice_hash = base64.b64encode(hashlib.sha256(invoice_xml).digest()).decode()
         enc_hash = base64.b64encode(hashlib.sha256(encrypted_invoice).digest()).decode()
@@ -150,6 +165,7 @@ class InvoiceService:
             "offlineMode": False,
         }
 
+        self.log("Uploading encrypted invoice to KSeF...")
         response = requests.post(
             f'{self.cfg.url}/sessions/online/{self.session["referenceNumber"]}/invoices',
             json=request_data,
@@ -163,6 +179,7 @@ class InvoiceService:
         result = response.json()
         self.session['refs'][xml_path] = result["referenceNumber"]
         self.session_save()
+        self.log(f"✅ Invoice uploaded. Reference: {result['referenceNumber']}")
         return result["referenceNumber"]
 
     def check_invoice_status(self, xml_path):

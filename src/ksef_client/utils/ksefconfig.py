@@ -59,22 +59,28 @@ class Config(configparser.ConfigParser):
         self.prefix = self.pesel if self.osoba else self.nip
         self.prefix_full = os.path.join(self.config_dir, self.prefix)
 
-        cert_file = os.path.join(self.config_dir, f'certificates-{self.version}.json')
-        if os.path.exists(cert_file):
-            with open(cert_file, 'rt', encoding="utf-8") as fp:
-                data = json.loads(fp.read())
-                if isinstance(data, dict) and 'keys' in data:
-                    self.certificates = data['keys']
-                elif isinstance(data, list):
-                    self.certificates = data
-                else: 
-                     # Fallback or unknown format
-                    self.certificates = []
-        else:
-            self.certificates = []
+        self.reload_certificates()
 
         if not initialize:
             assert self.nip and self.pesel
+
+    def reload_certificates(self):
+        """Wymusza ponowne wczytanie certyfikatów z dysku do pamięci."""
+        cert_file = os.path.join(self.config_dir, f'certificates-{self.version}.json')
+        if os.path.exists(cert_file):
+            with open(cert_file, 'rt', encoding="utf-8") as fp:
+                try:
+                    data = json.loads(fp.read())
+                    if isinstance(data, dict) and 'keys' in data:
+                        self.certificates = data['keys']
+                    elif isinstance(data, list):
+                        self.certificates = data
+                    else: 
+                        self.certificates = []
+                except json.JSONDecodeError:
+                    self.certificates = []
+        else:
+            self.certificates = []
 
     @property
     def sent_xml(self): return self.sent_dir / 'xml'

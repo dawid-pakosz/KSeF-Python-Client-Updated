@@ -21,14 +21,14 @@ class ExportService:
             subject = inv.get('subjectBy') or inv.get('issuedBy') or inv.get('receivedBy') or {}
             
             row = {
-                "Numer KSeF": inv.get('ksefNumber'),
-                "Data Wystawienia": inv.get('invoicingDate'),
-                "Data Odebrania": inv.get('acquisitionTimestamp'),
-                "NIP Kontrahenta": subject.get('identifier', {}).get('value'),
-                "Nazwa Kontrahenta": subject.get('name') or subject.get('fullName'),
-                "Kwota Brutto": inv.get('grossAmount'),
-                "Waluta": inv.get('currencyCode', 'PLN'),
-                "Numer Faktury": inv.get('invoiceNumber'),
+                "KSeF Number": inv.get('ksefNumber'),
+                "Issue Date": inv.get('invoicingDate'),
+                "Acquisition Date": inv.get('acquisitionTimestamp'),
+                "Contractor NIP": subject.get('identifier', {}).get('value'),
+                "Contractor Name": subject.get('name') or subject.get('fullName'),
+                "Gross Amount": inv.get('grossAmount'),
+                "Currency": inv.get('currencyCode', 'PLN'),
+                "Invoice Number": inv.get('invoiceNumber'),
             }
             flat_data.append(row)
 

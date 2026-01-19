@@ -5,19 +5,19 @@ class ProxyPasswordDialog(ctk.CTkToplevel):
     def __init__(self, master, username, on_confirm, **kwargs):
         super().__init__(master, **kwargs)
         
-        self.title("Uwierzytelnianie Proxy AD")
-        width = 400
-        height = 250
+        self.title("Proxy AD Authentication")
+        width = 460  # slightly wider to accommodate eye button
+        height = 260  # a bit taller for better spacing
         self.geometry(f"{width}x{height}")
         self.resizable(False, False)
         
-        # Stylistyka
+        # Styling
         FONT_UI = ("Segoe UI", 13)
         FONT_BOLD = ("Segoe UI", 13, "bold")
         
         self.on_confirm = on_confirm
         
-        # Centrowanie okna względem ekranu
+        # Center window on screen
         self.update_idletasks()
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
@@ -25,18 +25,18 @@ class ProxyPasswordDialog(ctk.CTkToplevel):
         y = (screen_height // 2) - (height // 2)
         self.geometry(f"{width}x{height}+{x}+{y}")
         
-        # Zapewnienie, że okno jest na górze
+        # Ensure window is on top
         self.attributes("-topmost", True)
-        self.grab_set()  # Modalność
+        self.grab_set()  # Modal
         
-        # Kontenery
+        # Containers
         self.main_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.main_frame.pack(fill="both", expand=True, padx=30, pady=20)
         
-        # Opis
+        # Description
         self.lbl_desc = ctk.CTkLabel(
             self.main_frame, 
-            text=f"Wymagane uwierzytelnianie", 
+            text=f"Authentication Required", 
             font=FONT_BOLD,
             justify="center"
         )
@@ -44,33 +44,64 @@ class ProxyPasswordDialog(ctk.CTkToplevel):
         
         self.lbl_info = ctk.CTkLabel(
             self.main_frame, 
-            text="Wpisz hasło Active Directory, aby odblokować\npołączenie z serwerem KSeF przez proxy.", 
+            text="Please enter your Active Directory password\nto unlock the KSeF server connection.", 
             font=("Segoe UI", 11),
             text_color="gray"
         )
         self.lbl_info.pack(pady=(0, 20))
         
-        # Pole hasła
+        # Password container
+        self.pass_container = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.pass_container.pack(fill="x", pady=10)
+
+        # Invisible spacer to balance the eye button on the right
+        # Button width (35) + padx (5) = 40
+        self.spacer = ctk.CTkLabel(self.pass_container, text="", width=40)
+        self.spacer.pack(side="left", expand=True)
+
+        # Password entry
         self.entry_password = ctk.CTkEntry(
-            self.main_frame, 
-            placeholder_text="Hasło AD...", 
+            self.pass_container, 
+            placeholder_text="Password...", 
             show="*", 
-            width=300,
+            width=260,
             height=35
         )
-        self.entry_password.pack(pady=10)
+        self.entry_password.pack(side="left")
         self.entry_password.bind("<Return>", lambda e: self.confirm())
         self.entry_password.focus_set()
+
+        # Show/Hide button
+        self.btn_show_pass = ctk.CTkButton(
+            self.pass_container,
+            text="👁️",
+            width=35,
+            height=35,
+            fg_color="transparent",
+            hover_color=("gray85", "gray25"),
+            text_color=("gray20", "gray80"),
+            command=self.toggle_password
+        )
+        self.btn_show_pass.pack(side="left", padx=(5, 0), expand=True)
         
-        # Przycisk
+        # Button
         self.btn_confirm = ctk.CTkButton(
             self.main_frame, 
-            text="Zatwierdź i Połącz", 
+            text="Confirm and Connect", 
             command=self.confirm,
             height=40,
             font=FONT_BOLD
         )
         self.btn_confirm.pack(pady=(20, 0))
+
+    def toggle_password(self):
+        """Switches password visibility."""
+        if self.entry_password.cget("show") == "*":
+            self.entry_password.configure(show="")
+            self.btn_show_pass.configure(text_color="#0066cc") # Blue highlight when visible
+        else:
+            self.entry_password.configure(show="*")
+            self.btn_show_pass.configure(text_color=("gray20", "gray80"))
 
     def confirm(self):
         password = self.entry_password.get()

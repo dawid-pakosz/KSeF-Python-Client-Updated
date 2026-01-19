@@ -10,6 +10,13 @@ class QueryService:
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self.auth_file = f"{cfg.prefix_full}-auth.json"
+
+    def log(self, message, level="INFO"):
+        """Central logging for the service, pipes to config callback if exists."""
+        if hasattr(self.cfg, 'log_callback') and self.cfg.log_callback:
+            self.cfg.log_callback(message, level)
+        else:
+            print(f"[{level}] {message}")
         
         if not os.path.exists(self.auth_file):
             raise KSeFError(f"Missing auth file: {self.auth_file}")
@@ -55,13 +62,13 @@ class QueryService:
                 if resp.status_code == 429:
                     try:
                         details = resp.json().get('status', {}).get('details', [])
-                        wait_msg = details[0] if details else "Zbyt wiele żądań."
-                        raise KSeFError(f"Limit API przekroczony (429): {wait_msg}", error_text)
+                        wait_msg = details[0] if details else "Too many requests."
+                        raise KSeFError(f"API Limit exceeded (429): {wait_msg}", error_text)
                     except:
-                        raise KSeFError("Przekroczono limit zapytań KSeF (429). Spróbuj ponownie za ok. 20-30 minut.", error_text)
+                        raise KSeFError("KSeF query limit exceeded (429). Please try again in 20-30 minutes.", error_text)
                 
                 if "narrow your filters" in error_text.lower():
-                    raise KSeFError("Zbyt szerokie zapytanie. Wybrany zakres dat i typ podmiotu zwraca ponad 10 000 wyników. Spróbuj zawęzić zakres (np. --days 1).", error_text)
+                    raise KSeFError("Query too broad. The selected date range and entity type returned over 10,000 results. Please narrow your filters (e.g., --days 1).", error_text)
                 raise KSeFError(f"Error querying invoices: {resp.status_code}", error_text)
             
             result = resp.json()

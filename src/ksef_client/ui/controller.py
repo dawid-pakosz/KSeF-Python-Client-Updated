@@ -61,45 +61,54 @@ class KSeFController:
     def handle_init(self):
         def task():
             if self.model.init_system():
-                messagebox.showinfo("Inicjalizacja", "Certyfikaty KSeF zostały pobrane. Możesz teraz otworzyć sesję.")
+                messagebox.showinfo("Initialization", "KSeF certificates have been downloaded. You can now open a session.")
             self.refresh_ui()
         threading.Thread(target=task).start()
 
     def handle_login(self):
-        # Pobieramy login systemowy (UID)
-        username = os.environ.get('USERNAME') or os.getlogin() or "Użytkownik"
+        # System login (UID)
+        username = os.environ.get('USERNAME') or os.getlogin() or "User"
         
         def on_proxy_confirm(password=None):
             if password:
-                # Tymczasowe działanie: print do terminala (do testów) zgodnie z prośbą
-                print(f">>> [TEST] Przechwycono hasło proxy dla {username}: {password}")
-                self.model.log(f"Hasło proxy zostało podane (tryb testowy).")
+                # Set proxy environment variables
+                proxy_url = f"http://{username}:{password}@ncproxy1:8080"
+                os.environ["HTTP_PROXY"] = proxy_url
+                os.environ["HTTPS_PROXY"] = proxy_url
+                # Debug print
+                print(f">>> [TEST] Proxy env set for {username}: {proxy_url}")
+                self.model.log("Proxy password provided and environment variables set.")
+            else:
+                # No password entered – keep existing env or clear
+                os.environ.pop("HTTP_PROXY", None)
+                os.environ.pop("HTTPS_PROXY", None)
+                self.model.log("Proxy password not provided; proxy disabled.")
             
-            # Tu nastąpi faktyczne wywołanie skryptów
+            # Action
             def task():
-                # Krok 1: Inicjalizacja (pobranie certyfikatów)
+                # Step 1: Init (fetching certificates)
                 if not self.model.init_system():
                     self.refresh_ui()
-                    messagebox.showerror("Błąd", "Nie udało się pobrać certyfikatów.")
+                    messagebox.showerror("Error", "Failed to fetch certificates.")
                     return
 
-                # Krok 2: Logowanie i otwarcie sesji
+                # Step 2: Login and open session
                 if self.model.open_session():
                     self.refresh_ui()
-                    messagebox.showinfo("KSeF", "Pomyślnie zalogowano i otwarto sesję.")
+                    messagebox.showinfo("KSeF", "Successfully logged in and session started.")
                 else:
                     self.refresh_ui()
-                    messagebox.showerror("Błąd", "Nie udało się zalogować. Sprawdź logi w konsoli.")
+                    messagebox.showerror("Error", "Login failed. Check logs for details.")
             
             threading.Thread(target=task).start()
 
-        # Sprawdzamy w configu czy proxy jest aktywne
+        # Check if proxy is enabled in config
         if self.model.config.proxy_enabled:
-            # Wyświetlamy okienko pop-up
+            # Show pop-up
             ProxyPasswordDialog(self.view, username, on_proxy_confirm)
         else:
-            # Pomijamy okienko i idziemy dalej
-            self.model.log("Proxy wyłączone w konfiguracji. Przechodzę do bezpośredniego logowania.")
+            # Skip dialog
+            self.model.log("Proxy disabled in config. Proceeding to direct login.")
             on_proxy_confirm()
 
     def handle_check_status(self):
@@ -111,7 +120,7 @@ class KSeFController:
             if self.model.refresh_session_token():
                 self.refresh_ui()
                 if not silent:
-                    messagebox.showinfo("KSeF", "Token został odświeżony.")
+                    messagebox.showinfo("KSeF", "Token has been refreshed.")
             self.refresh_ui()
         threading.Thread(target=task).start()
 
@@ -119,33 +128,33 @@ class KSeFController:
         def task():
             if self.model.logout():
                 self.refresh_ui()
-                messagebox.showinfo("KSeF", "Sesja została zamknięta.")
+                messagebox.showinfo("KSeF", "Session has been closed.")
             self.refresh_ui()
         threading.Thread(target=task).start()
 
-    # --- AKCJE SPRZEDAŻY ---
+    # --- SALES ACTIONS ---
     def handle_convert_excel(self):
-        file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx")])
+        file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx")], title="Select Excel file to convert")
         if file_path:
             template = self.view.views['sales'].combo_mapping.get()
             def task():
                 self.model.convert_excel_to_xml(file_path, template)
                 self.refresh_ui()
-                messagebox.showinfo("Sukces", f"Przekonwertowano plik za pomocą {template}\n(Funkcja mapowania w przygotowaniu)")
+                messagebox.showinfo("Success", f"Converted using {template}\n(Mapping engine in progress)")
             threading.Thread(target=task).start()
 
     def handle_send_xml(self):
-        file_path = filedialog.askopenfilename(filetypes=[("XML files", "*.xml")])
+        file_path = filedialog.askopenfilename(filetypes=[("XML files", "*.xml")], title="Select XML invoice to send")
         if file_path:
             def task():
                 if self.model.send_xml_invoice(file_path):
                     self.refresh_ui()
-                    messagebox.showinfo("Sukces", "Faktura wysłana do KSeF.")
+                    messagebox.showinfo("Success", "Invoice sent to KSeF.")
                 self.refresh_ui()
             threading.Thread(target=task).start()
 
     def handle_check_upo(self):
-        file_path = filedialog.askopenfilename(filetypes=[("XML files", "*.xml")], title="Wybierz wysłany plik XML, aby pobrać UPO")
+        file_path = filedialog.askopenfilename(filetypes=[("XML files", "*.xml")], title="Select XML file to check UPO")
         if file_path:
             def task():
                 self.model.check_status_upo(file_path)
@@ -153,37 +162,34 @@ class KSeFController:
             threading.Thread(target=task).start()
 
     def handle_preview(self):
-        file_path = filedialog.askopenfilename(filetypes=[("XML files", "*.xml")], title="Wybierz plik XML do wizualizacji")
+        file_path = filedialog.askopenfilename(filetypes=[("XML files", "*.xml")], title="Select XML file for visualization")
         if file_path:
-            self.model.log(f"Generowanie wizualizacji dla {file_path}...")
+            self.model.log(f"Generating visualization for {file_path}...")
             try:
                 from ksef_client.views.ksef_viz import run_visualization
-                # Wizualizacja zapisuje HTML i może go otworzyć
                 if run_visualization(file_path, theme="corporate"):
-                    self.model.log("✅ Wizualizacja wygenerowana.")
-                    # Tu można dodać automatyczne otwarcie w przeglądarce
+                    self.model.log("✅ Visualization generated.")
             except Exception as e:
-                self.model.log(f"❌ Bląd wizualizacji: {e}", "ERROR")
+                self.model.log(f"❌ Visualization error: {e}", "ERROR")
             self.refresh_ui()
 
-    # --- AKCJE ZAKUPÓW ---
+    # --- PURCHASE ACTIONS ---
     def handle_sync_purchases(self):
         def task():
             if self.model.fetch_purchases():
                 self.refresh_ui()
-                messagebox.showinfo("KSeF", "Pobrano listę faktur zakupowych.")
+                messagebox.showinfo("KSeF", "Purchase invoices fetched successfully.")
             self.refresh_ui()
         threading.Thread(target=task).start()
 
     def handle_download_xml(self):
-        # W modelu można dodać metodę pobierania konkretnych XMLi
-        self.model.log("Pobieranie plików XML (funkcja w przygotowaniu)...")
+        self.model.log("Downloading XML files (feature in progress)...")
         self.refresh_ui()
 
     def handle_export_excel(self):
         def task():
             if self.model.export_purchases_to_excel():
                 self.refresh_ui()
-                messagebox.showinfo("Sukces", "Zestawienie Excel zostało wygenerowane w folderze reports.")
+                messagebox.showinfo("Success", "Excel report generated in 'reports' folder.")
             self.refresh_ui()
         threading.Thread(target=task).start()
