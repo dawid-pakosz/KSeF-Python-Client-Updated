@@ -86,7 +86,7 @@ class InvoiceService:
         }
 
         response = requests.post(
-            f"{self.cfg.url}/api/v2/sessions/online",
+            f"{self.cfg.url}/sessions/online",
             json=request_data,
             headers={"Authorization": f"Bearer {self.access_token}"},
             timeout=30,
@@ -107,7 +107,7 @@ class InvoiceService:
             return
 
         requests.post(
-            f'{self.cfg.url}/api/v2/sessions/online/{ref}/close',
+            f'{self.cfg.url}/sessions/online/{ref}/close',
             headers={"Authorization": f"Bearer {self.access_token}"},
             timeout=15,
         )
@@ -151,7 +151,7 @@ class InvoiceService:
         }
 
         response = requests.post(
-            f'{self.cfg.url}/api/v2/sessions/online/{self.session["referenceNumber"]}/invoices',
+            f'{self.cfg.url}/sessions/online/{self.session["referenceNumber"]}/invoices',
             json=request_data,
             headers={"Authorization": f"Bearer {self.access_token}"},
             timeout=30,
@@ -170,7 +170,7 @@ class InvoiceService:
         if not invoice_ref: return None
 
         response = requests.get(
-            f'{self.cfg.url}/api/v2/sessions/{self.session["referenceNumber"]}/invoices/{invoice_ref}',
+            f'{self.cfg.url}/sessions/{self.session["referenceNumber"]}/invoices/{invoice_ref}',
             headers={"Authorization": f"Bearer {self.access_token}"},
             timeout=15,
         )
@@ -201,7 +201,7 @@ class InvoiceService:
         upo_url = data.get('upoDownloadUrl')
         if not upo_url:
              response = requests.get(
-                f'{self.cfg.url}/api/v2/sessions/{self.session["referenceNumber"]}/invoices/{data["ksefNumber"]}/upo',
+                f'{self.cfg.url}/sessions/{self.session["referenceNumber"]}/invoices/{data["ksefNumber"]}/upo',
                 headers={"Authorization": f"Bearer {self.access_token}"},
                 timeout=15,
             )

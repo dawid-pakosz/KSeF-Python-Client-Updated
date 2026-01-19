@@ -8,3 +8,5 @@ python-dateutil
 qrcode[pil]
 pandas
 openpyxl
+customtkinter
+Pillow

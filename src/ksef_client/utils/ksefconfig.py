@@ -44,6 +44,7 @@ class Config(configparser.ConfigParser):
         self.firma = firma
         self.osoba = osoba
         self.version = self.get('ksef', 'version', fallback='test')
+        self.proxy_enabled = self.getboolean('ksef', 'proxy_enabled', fallback=False)
         self.url = self.get(self.version, 'url')
         self.kseftoken = self.get(f'firma{firma}', 'token', fallback=None)
 
@@ -61,7 +62,14 @@ class Config(configparser.ConfigParser):
         cert_file = os.path.join(self.config_dir, f'certificates-{self.version}.json')
         if os.path.exists(cert_file):
             with open(cert_file, 'rt', encoding="utf-8") as fp:
-                self.certificates = json.loads(fp.read())
+                data = json.loads(fp.read())
+                if isinstance(data, dict) and 'keys' in data:
+                    self.certificates = data['keys']
+                elif isinstance(data, list):
+                    self.certificates = data
+                else: 
+                     # Fallback or unknown format
+                    self.certificates = []
         else:
             self.certificates = []
 
@@ -82,10 +90,22 @@ class Config(configparser.ConfigParser):
     def reports(self): return self.reports_dir
 
     def loadcertificate(self, cert_data):
+        from cryptography.hazmat.primitives import serialization
         cert_bytes = base64.b64decode(cert_data)
-        certificate = x509.load_der_x509_certificate(cert_bytes)
-        public_key = certificate.public_key()
-        return certificate, public_key
+        try:
+            # Try loading as X.509 Certificate (DER)
+            certificate = x509.load_der_x509_certificate(cert_bytes)
+            public_key = certificate.public_key()
+            return certificate, public_key
+        except Exception:
+            try:
+                # Try loading as PEM Public Key
+                 from cryptography.hazmat.primitives.serialization import load_pem_public_key
+                 public_key = load_pem_public_key(cert_bytes)
+                 return None, public_key
+            except Exception as e:
+                # If both fail, re-raise
+                raise ValueError(f"Failed to load certificate/key: {str(e)}")
 
     def getcertificte(self, token=True):
         for cert in self.certificates:

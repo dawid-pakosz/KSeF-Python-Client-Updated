@@ -47,7 +47,7 @@ class QueryService:
         }
 
         while True:
-            url = f"{self.cfg.url}/api/v2/invoices/query/metadata?pageOffset={page_offset}&pageSize={page_size}"
+            url = f"{self.cfg.url}/invoices/query/metadata?pageOffset={page_offset}&pageSize={page_size}"
             resp = requests.post(url, json=data, headers=self._get_headers(), timeout=15)
             
             if resp.status_code != 200:
@@ -81,7 +81,7 @@ class QueryService:
         Downloads the full XML of an invoice by KSeF number.
         Saves it to storage/inbox.
         """
-        url = f"{self.cfg.url}/api/v2/invoices/ksef/{ksef_number}"
+        url = f"{self.cfg.url}/invoices/ksef/{ksef_number}"
         resp = requests.get(url, headers=self._get_headers(), timeout=15)
         
         if resp.status_code != 200:
