@@ -158,6 +158,7 @@ class KSeFModel:
                 
             invoices = self.query_service.list_invoices(days=days, subject_type=subject_type)
             self.purchase_invoices_raw = invoices  # Store raw for export
+            self.last_subject_type = subject_type   # Store for export consistency
             
             self.purchase_invoices = []
             
@@ -214,8 +215,9 @@ class KSeFModel:
             timestamp = time.strftime('%Y%m%d_%H%M%S')
             output_path = self.config.reports / f"summary_report_{timestamp}.xlsx"
             
-            # Use ExportService to process raw list
-            path = self.export_service.export_to_excel(self.purchase_invoices_raw, str(output_path))
+            # Use ExportService with stored subject_type for mapping consistency
+            subj_type = getattr(self, 'last_subject_type', 'Subject2')
+            path = self.export_service.export_to_excel(self.purchase_invoices_raw, str(output_path), subject_type=subj_type)
             
             self.log(f"✅ Report exported to: {path}")
             return path

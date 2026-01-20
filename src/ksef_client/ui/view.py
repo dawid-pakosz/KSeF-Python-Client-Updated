@@ -88,6 +88,10 @@ class Sidebar(ctk.CTkFrame):
         current = ctk.get_appearance_mode()
         new_mode = "Dark" if current == "Light" else "Light"
         ctk.set_appearance_mode(new_mode)
+        
+        # Notify the root window to refresh non-native components (like Treeview)
+        if hasattr(self.master, "handle_theme_change"):
+            self.after(10, self.master.handle_theme_change) 
 
 class TopHeader(ctk.CTkFrame):
     def __init__(self, master, model, **kwargs):
@@ -136,13 +140,15 @@ def setup_treeview_styles():
         fieldbackground=bg_color,
         rowheight=35,
         font=("Segoe UI", 11),
-        borderwidth=0
+        borderwidth=1,       # Dodanie obramowania
+        relief="flat"
     )
     
     style.configure("Treeview.Heading", 
         background=header_bg,
         foreground=header_fg,
-        relief="flat",
+        relief="groove",      # Efekt linii pionowych w nagłówkach
+        borderwidth=1,
         font=("Segoe UI", 11, "bold")
     )
     
@@ -328,6 +334,12 @@ class PurchasesView(ctk.CTkFrame):
         self.tree.tag_configure('even', background=row_even)
         self.tree.tag_configure('odd', background=row_odd)
 
+    def refresh_theme(self):
+        """Refreshes the table colors without reloading data."""
+        row_even, row_odd = setup_treeview_styles()
+        self.tree.tag_configure('even', background=row_even)
+        self.tree.tag_configure('odd', background=row_odd)
+
     def reset_table(self):
         """Clears all entries from the table."""
         for item in self.tree.get_children():
@@ -440,3 +452,9 @@ class KSeFViewV4(ctk.CTk):
             self.status_label.configure(text="Session Active", text_color="#28a745") # Green (Success)
         else:
             self.status_label.configure(text="No Session", text_color="#dc3545") # Red (Danger)
+
+    def handle_theme_change(self):
+        """Propagates theme change to all sub-views that need manual refresh."""
+        for view in self.views.values():
+            if hasattr(view, "refresh_theme"):
+                view.refresh_theme()
