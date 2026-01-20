@@ -67,6 +67,10 @@ class KSeFModel:
             if not self.invoice_service:
                 self.invoice_service = InvoiceService(self.config)
             ref_no = self.invoice_service.session_open()
+            
+            # Initialize QueryService after login as it needs the token
+            self.query_service = QueryService(self.config)
+            
             self.is_logged_in = True
             self.session_token = ref_no
             
@@ -146,36 +150,78 @@ class KSeFModel:
             self.log(f"❌ Status error: {str(e)}", "ERROR")
             return False
 
-    def fetch_purchases(self):
-        self.log("Fetching purchase invoices (QueryService)...")
+    def fetch_purchases(self, days=30, subject_type="Subject2"):
+        self.log(f"Fetching {subject_type} invoices (last {days} days)...")
         try:
-            invoices = self.query_service.list_invoices(days=30, subject_type="Subject2")
+            if not self.query_service:
+                self.query_service = QueryService(self.config)
+                
+            invoices = self.query_service.list_invoices(days=days, subject_type=subject_type)
+            self.purchase_invoices_raw = invoices  # Store raw for export
+            
+            # FORCE DEBUG TO CONSOLE (STDOUT)
+            if invoices:
+                import json
+                print("\n" + "="*50)
+                print(f"DEBUG KSEF API RAW JSON (First Item):")
+                print(json.dumps(invoices[0], indent=2))
+                print("="*50 + "\n")
+                self.log(f"DEBUG: Sprawdź terminal/konsolę dla surowych danych JSON.")
+
             self.purchase_invoices = []
+            
             for inv in invoices:
+                # Basic metadata extraction
                 ksef = inv.get('ksefNumber', 'None')
                 date = inv.get('invoicingDate', 'None')
-                seller = inv.get('subjectBy', {}).get('name', 'Unknown')
-                amount = f"{inv.get('grossAmount', '0.00')} PLN"
-                self.purchase_invoices.append((ksef, date, seller, amount))
+                inv_no = inv.get('invoiceNumber', 'None')
+                curr = inv.get('currencyCode', 'PLN')
+                
+                # Robust Subject extraction (KSeF API metadata varies)
+                # Possible keys: subjectBy, subjectTo, issuedBy, receivedBy
+                subj_obj = inv.get('subjectBy') or inv.get('issuedBy') or inv.get('receivedBy') or inv.get('subjectTo') or {}
+                
+                # Try to get NIP (identifier value)
+                # Logic: Check identifier -> value OR subjectIdentifier -> identifier
+                identifier = subj_obj.get('identifier', {})
+                if not identifier: 
+                    identifier = subj_obj.get('subjectIdentifier', {}).get('identifier', {})
+                
+                nip = identifier.get('value') if isinstance(identifier, dict) else identifier
+                if not nip: nip = 'None'
+                
+                # Try to get Name
+                name = subj_obj.get('name') or subj_obj.get('fullName') or 'Unknown'
+                
+                # Amounts
+                gross = str(inv.get('grossAmount', '0.00'))
+                net = str(inv.get('netAmount', '0.00')) 
+                vat = str(inv.get('vatAmount', '0.00'))
+                
+                # Format for Treeview (nip, name, ksef_no, inv_no, date, net, gross, vat, currency)
+                self.purchase_invoices.append((nip, name, ksef, inv_no, date, net, gross, vat, curr))
             
             self.log(f"✅ Fetched {len(self.purchase_invoices)} invoices.")
-            return True
+            return self.purchase_invoices
         except Exception as e:
             self.log(f"❌ Fetch error: {str(e)}", "ERROR")
             return False
 
     def export_purchases_to_excel(self):
-        if not self.purchase_invoices:
+        if not hasattr(self, 'purchase_invoices_raw') or not self.purchase_invoices_raw:
             self.log("⚠️ No data to export. Fetch invoices first.", "WARNING")
             return False
             
-        self.log("Generating summary report to Excel...")
+        self.log("Generating summary report from last fetch...")
         try:
-            invoices = self.query_service.list_invoices(days=30, subject_type="Subject2")
-            output_path = self.config.reports / f"purchase_report_{time.strftime('%Y%m%d')}.xlsx"
-            path = self.export_service.export_to_excel(invoices, str(output_path))
+            timestamp = time.strftime('%Y%m%d_%H%M%S')
+            output_path = self.config.reports / f"summary_report_{timestamp}.xlsx"
+            
+            # Use ExportService to process raw list
+            path = self.export_service.export_to_excel(self.purchase_invoices_raw, str(output_path))
+            
             self.log(f"✅ Report exported to: {path}")
-            return True
+            return path
         except Exception as e:
             self.log(f"❌ Export error: {str(e)}", "ERROR")
             return False

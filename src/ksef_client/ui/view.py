@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 import customtkinter as ctk
 from PIL import Image
 import os
@@ -56,11 +56,11 @@ class Sidebar(ctk.CTkFrame):
         self.btn_dash.pack(fill="x", pady=(40, 0))
         self.nav_buttons["session"] = self.btn_dash
 
-        self.btn_sales = NavButton(self, text="Invoices Sales", icon_text="📤", command=lambda: callbacks['menu']("sales"))
+        self.btn_sales = NavButton(self, text="Send Invoices", icon_text="📤", command=lambda: callbacks['menu']("sales"))
         self.btn_sales.pack(fill="x", pady=0)
         self.nav_buttons["sales"] = self.btn_sales
 
-        self.btn_purchases = NavButton(self, text="Invoices Purchase", icon_text="📥", command=lambda: callbacks['menu']("purchases"))
+        self.btn_purchases = NavButton(self, text="Received Invoices", icon_text="📥", command=lambda: callbacks['menu']("purchases"))
         self.btn_purchases.pack(fill="x", pady=0)
         self.nav_buttons["purchases"] = self.btn_purchases
 
@@ -103,6 +103,60 @@ class TopHeader(ctk.CTkFrame):
 
     def set_title(self, text):
         self.lbl_title.configure(text=text)
+
+def setup_treeview_styles():
+    """Konfiguracja stylów dla ttk.Treeview - Pełna obsługa motywów."""
+    style = ttk.Style()
+    
+    # Próba wymuszenia odświeżenia stylu
+    style.theme_use("default")
+    
+    appearance = ctk.get_appearance_mode().lower()
+    
+    if appearance == "dark":
+        bg_color = "#1d1d1d"
+        fg_color = "#e1e1e1"
+        header_bg = "#2b2b2b"
+        header_fg = "#ffffff"
+        row_even = "#252525"
+        row_odd = "#1d1d1d"
+    else:
+        bg_color = "#ffffff"
+        fg_color = "#000000"
+        header_bg = "#f0f0f0"
+        header_fg = "#000000"
+        row_even = "#f9f9f9"
+        row_odd = "#ffffff"
+
+    selected_bg = "#0066cc"
+    
+    style.configure("Treeview", 
+        background=bg_color,
+        foreground=fg_color,
+        fieldbackground=bg_color,
+        rowheight=35,
+        font=("Segoe UI", 11),
+        borderwidth=0
+    )
+    
+    style.configure("Treeview.Heading", 
+        background=header_bg,
+        foreground=header_fg,
+        relief="flat",
+        font=("Segoe UI", 11, "bold")
+    )
+    
+    style.map("Treeview.Heading",
+        background=[('active', '#0052a3')],
+        foreground=[('active', 'white')]
+    )
+
+    style.map("Treeview",
+        background=[('selected', selected_bg)],
+        foreground=[('selected', 'white')]
+    )
+    
+    return row_even, row_odd
 
 class DashboardView(ctk.CTkFrame):
     def __init__(self, master, model, callbacks, **kwargs):
@@ -156,20 +210,151 @@ class PurchasesView(ctk.CTkFrame):
         BTN_COLOR = "#0066cc"
         BTN_HOVER = "#0052a3"
 
-        self.toolbar = ctk.CTkFrame(self, height=60, fg_color="transparent")
+        # Toolbar container
+        self.toolbar = ctk.CTkFrame(self, height=80, fg_color="transparent")
         self.toolbar.pack(fill="x", padx=25, pady=(20, 15))
 
+        # Filter controls container
+        self.filter_frame = ctk.CTkFrame(self.toolbar, fg_color="transparent")
+        self.filter_frame.pack(side="left", padx=5)
+
+        # Invoice type selector (Subject1 = sent, Subject2 = received)
+        self.var_invoice_type = ctk.StringVar(value="Sales invoices (Subject1)")
+        self.lbl_type = ctk.CTkLabel(self.filter_frame, text="Invoice type:", font=FONT_UI)
+        self.lbl_type.pack(side="left", padx=(0, 5))
+        self.opt_type = ctk.CTkOptionMenu(
+            self.filter_frame,
+            values=["Sales invoices (Subject1)", "Purchase invoices (Subject2)"],
+            variable=self.var_invoice_type,
+            width=180,
+            command= lambda _: None 
+        )
+        self.opt_type.pack(side="left", padx=(0, 10))           
+
+        # Mapping to actual API values (used in controller):
+        # "Sales invoices (Subject1)" -> "Subject1"
+        # "Purchase invoices (Subject2)" -> "Subject2"
+
+
+        # Days slider
+        self.var_days = ctk.IntVar(value=30)
+        self.lbl_days = ctk.CTkLabel(self.filter_frame, text="Period (days):", font=FONT_UI)
+        self.lbl_days.pack(side="left", padx=(0, 5))
+        self.slider_days = ctk.CTkSlider(
+            self.filter_frame,
+            from_=1,
+            to=90,
+            number_of_steps=89,
+            variable=self.var_days,
+            width=150,
+            command=lambda v: self.lbl_days_val.configure(text=f"{int(float(v))} d")
+        )
+        self.slider_days.pack(side="left")
+        self.lbl_days_val = ctk.CTkLabel(self.filter_frame, text="30 d", font=FONT_UI)
+        self.lbl_days_val.pack(side="left", padx=(5, 0))
+
+        # Action buttons (Fetch & Export)
         self.btn_sync = ctk.CTkButton(self.toolbar, text="Fetch from KSeF", command=callbacks['sync'], corner_radius=8, fg_color=BTN_COLOR, hover_color=BTN_HOVER)
-        self.btn_sync.pack(side="left", padx=5)
-
+        self.btn_sync.pack(side="right", padx=5)
         self.btn_export = ctk.CTkButton(self.toolbar, text="Export to Excel", command=callbacks['export'], corner_radius=8, fg_color=BTN_COLOR, hover_color=BTN_HOVER)
-        self.btn_export.pack(side="left", padx=5)
+        self.btn_export.pack(side="right", padx=5)
 
-        self.table_container = ctk.CTkScrollableFrame(self, corner_radius=10, border_width=1, border_color=("gray85", "gray20"))
-        self.table_container.pack(fill="both", expand=True, padx=30, pady=10)
+        self.btn_clear = ctk.CTkButton(self.toolbar, text="Clear Data", command=self.reset_table, corner_radius=8, fg_color="gray30", hover_color="gray25")
+        self.btn_clear.pack(side="right", padx=5)
+
+        # Container for Treeview
+        self.table_frame = ctk.CTkFrame(self, corner_radius=10, border_width=1, border_color=("gray85", "gray20"))
+        self.table_frame.pack(fill="both", expand=True, padx=30, pady=10)
+
+        # Setup Treeview
+        setup_treeview_styles()
         
-        self.table_label = ctk.CTkLabel(self.table_container, text="[ List of purchase invoices will appear here ]", font=FONT_UI, text_color="gray")
-        self.table_label.pack(expand=True, pady=100)
+        self.columns = ("nip", "name", "ksef_no", "inv_no", "date", "net", "gross", "vat", "curr")
+        self.tree = ttk.Treeview(self.table_frame, columns=self.columns, show="headings", selectmode="browse")
+        
+        # Define headings with sorting command
+        for col in self.columns:
+            display_names = {
+                "nip": "NIP", "name": "Nazwa", "ksef_no": "Numer KSeF", 
+                "inv_no": "Nr faktury", "date": "Data wyst.", "net": "Netto", 
+                "gross": "Brutto", "vat": "VAT", "curr": "Waluta"
+            }
+            self.tree.heading(col, text=display_names[col], command=lambda _c=col: self.sort_column(_c, False))
+
+        # Column settings
+        self.tree.column("nip", width=110, anchor="w", stretch=False)
+        self.tree.column("name", width=220, anchor="w")
+        self.tree.column("ksef_no", width=300, anchor="w")
+        self.tree.column("inv_no", width=120, anchor="w")
+        self.tree.column("date", width=100, anchor="center")
+        self.tree.column("net", width=90, anchor="e")
+        self.tree.column("gross", width=90, anchor="e")
+        self.tree.column("vat", width=80, anchor="e")
+        self.tree.column("curr", width=50, anchor="center")
+
+        # MODERN SCROLLBARS (ctk instead of ttk)
+        self.vsb = ctk.CTkScrollbar(self.table_frame, orientation="vertical", command=self.tree.yview)
+        self.hsb = ctk.CTkScrollbar(self.table_frame, orientation="horizontal", command=self.tree.xview)
+        self.tree.configure(yscrollcommand=self.vsb.set, xscrollcommand=self.hsb.set)
+
+        # Layout using grid
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        self.vsb.grid(row=0, column=1, sticky="ns", padx=(1, 0))
+        self.hsb.grid(row=1, column=0, sticky="ew", pady=(1, 0))
+        
+        self.table_frame.grid_rowconfigure(0, weight=1)
+        self.table_frame.grid_columnconfigure(0, weight=1)
+
+    def update_table(self, data_list):
+        """
+        data_list: List of tuples (nip, name, ksef_no, inv_no, date, net, gross, vat, currency)
+        """
+        # Refresh styles based on current theme and get zebra colors
+        row_even, row_odd = setup_treeview_styles()
+
+        # Clear current data
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+
+        if not data_list:
+            return
+
+        # Insert new data
+        for i, row in enumerate(data_list):
+            tag = 'even' if i % 2 == 0 else 'odd'
+            self.tree.insert("", "end", values=row, tags=(tag,))
+        
+        # Zebra striping - Dynamically set colors
+        self.tree.tag_configure('even', background=row_even)
+        self.tree.tag_configure('odd', background=row_odd)
+
+    def reset_table(self):
+        """Clears all entries from the table."""
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+
+    def sort_column(self, col, reverse):
+        """Sorts treeview content when a column header is clicked."""
+        l = [(self.tree.set(k, col), k) for k in self.tree.get_children('')]
+        
+        # Try numeric sort for amount columns
+        if col in ["net", "gross", "vat"]:
+            try:
+                l.sort(key=lambda t: float(t[0].replace(',', '.')), reverse=reverse)
+            except ValueError:
+                l.sort(reverse=reverse)
+        else:
+            l.sort(reverse=reverse)
+
+        # Rearrange items in sorted order
+        for index, (val, k) in enumerate(l):
+            self.tree.move(k, '', index)
+            # Re-apply zebra tags after moving
+            tag = 'even' if index % 2 == 0 else 'odd'
+            self.tree.item(k, tags=(tag,))
+
+        # Reverse sort next time
+        self.tree.heading(col, command=lambda: self.sort_column(col, not reverse))
 
 class KSeFViewV4(ctk.CTk):
     def __init__(self, callbacks, model):

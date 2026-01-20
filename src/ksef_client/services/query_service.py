@@ -10,6 +10,22 @@ class QueryService:
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self.auth_file = f"{cfg.prefix_full}-auth.json"
+        # Load authentication data (access token) immediately 
+        self._load_auth()
+
+    def _load_auth(self):
+        """Read the auth JSON file and store the access token."""
+        if not os.path.exists(self.auth_file):
+            # It's possible the file doesn't exist yet if we haven't logged in,
+            # so we just skip loading. The methods needing token will fail later or re-try.
+            return
+
+        try:
+            with open(self.auth_file, "rt", encoding="utf-8") as fp:
+                self.auth = json.load(fp)
+            self.access_token = self.auth["accessToken"]["token"]
+        except Exception as e:
+            print(f"[WARN] Failed to load auth file: {e}")
 
     def log(self, message, level="INFO"):
         """Central logging for the service, pipes to config callback if exists."""
@@ -17,14 +33,6 @@ class QueryService:
             self.cfg.log_callback(message, level)
         else:
             print(f"[{level}] {message}")
-        
-        if not os.path.exists(self.auth_file):
-            raise KSeFError(f"Missing auth file: {self.auth_file}")
-
-        with open(self.auth_file, "rt", encoding="utf-8") as fp:
-            self.auth = json.loads(fp.read())
-
-        self.access_token = self.auth["accessToken"]["token"]
 
     def _get_headers(self):
         return {
