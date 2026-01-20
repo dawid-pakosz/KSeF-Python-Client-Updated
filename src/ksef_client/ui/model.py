@@ -159,44 +159,41 @@ class KSeFModel:
             invoices = self.query_service.list_invoices(days=days, subject_type=subject_type)
             self.purchase_invoices_raw = invoices  # Store raw for export
             
-            # FORCE DEBUG TO CONSOLE (STDOUT)
-            if invoices:
-                import json
-                print("\n" + "="*50)
-                print(f"DEBUG KSEF API RAW JSON (First Item):")
-                print(json.dumps(invoices[0], indent=2))
-                print("="*50 + "\n")
-                self.log(f"DEBUG: Sprawdź terminal/konsolę dla surowych danych JSON.")
-
             self.purchase_invoices = []
             
             for inv in invoices:
                 # Basic metadata extraction
                 ksef = inv.get('ksefNumber', 'None')
                 date = inv.get('invoicingDate', 'None')
+                if 'T' in date: date = date.split('T')[0] # Clean date format
+                
                 inv_no = inv.get('invoiceNumber', 'None')
-                curr = inv.get('currencyCode', 'PLN')
+                curr = inv.get('currency', 'PLN') # JSON shows 'currency' not 'currencyCode'
                 
-                # Robust Subject extraction (KSeF API metadata varies)
-                # Possible keys: subjectBy, subjectTo, issuedBy, receivedBy
-                subj_obj = inv.get('subjectBy') or inv.get('issuedBy') or inv.get('receivedBy') or inv.get('subjectTo') or {}
+                # Robust Subject extraction based on subject_type
+                # If we query as Buyer (Subject2), result counterparty is Seller
+                # If we query as Seller (Subject1), result counterparty is Buyer
+                if subject_type == "Subject2":
+                    subj_obj = inv.get('seller') or {}
+                else:
+                    subj_obj = inv.get('buyer') or {}
                 
-                # Try to get NIP (identifier value)
-                # Logic: Check identifier -> value OR subjectIdentifier -> identifier
-                identifier = subj_obj.get('identifier', {})
-                if not identifier: 
-                    identifier = subj_obj.get('subjectIdentifier', {}).get('identifier', {})
+                # Check NIP
+                # Logic: Check identifier -> value OR direct 'nip' key
+                nip = 'None'
+                identifier = subj_obj.get('identifier')
+                if isinstance(identifier, dict):
+                    nip = identifier.get('value', 'None')
+                else:
+                    nip = subj_obj.get('nip', 'None')
                 
-                nip = identifier.get('value') if isinstance(identifier, dict) else identifier
-                if not nip: nip = 'None'
-                
-                # Try to get Name
+                # Check Name
                 name = subj_obj.get('name') or subj_obj.get('fullName') or 'Unknown'
                 
-                # Amounts
-                gross = str(inv.get('grossAmount', '0.00'))
-                net = str(inv.get('netAmount', '0.00')) 
-                vat = str(inv.get('vatAmount', '0.00'))
+                # Amounts directly from root
+                gross = f"{inv.get('grossAmount', 0):.2f}"
+                net = f"{inv.get('netAmount', 0):.2f}"
+                vat = f"{inv.get('vatAmount', 0):.2f}"
                 
                 # Format for Treeview (nip, name, ksef_no, inv_no, date, net, gross, vat, currency)
                 self.purchase_invoices.append((nip, name, ksef, inv_no, date, net, gross, vat, curr))
