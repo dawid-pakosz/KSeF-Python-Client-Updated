@@ -1,0 +1,33 @@
+{
+    "pattern_name": "ACC_Pattern_Ref_D5",
+    "description": "Wzorzec referencyjny ACC-3 na podstawie pliku D5",
+    "mapping": {
+        "header": {
+            "KodWaluty": {
+                "source": "CONSTANT",
+                "value": "PLN"
+            },
+            "P_1": {
+                "source": "NAME",
+                "value": "date_issue"
+            },
+            "P_2": {
+                "source": "NAME",
+                "value": "note_title"
+            },
+            "P_6": {
+                "source": "NAME",
+                "value": "date_sale"
+            }
+        },
+        "buyer": {
+            "FullBlock": {
+                "source": "NAME",
+                "value": "recipient_info"
+            }
+        },
+        "items": {
+            "anchor_range": "entries_array"
+        }
+    }
+}
