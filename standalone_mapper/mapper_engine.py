@@ -42,9 +42,15 @@ class StandaloneMapper:
 
         # 3. Weryfikacja z konfiguracją mapowania
         print("\n" + "-"*40)
-        print("WERYFIKACJA Z TWOIM PLIKEIM mapping_config.json:")
+        print("WERYFIKACJA Z TWOIM PLIKIEM mapping_config.json:")
+        
+        # Pobieramy wszystkie nazwy (globalne + lokalne)
+        all_found_names = set(global_names)
+        for sheet in wb.worksheets:
+            if sheet.defined_names:
+                all_found_names.update(sheet.defined_names.keys())
+
         expected_names = []
-        # Wyciągamy nazwy, których szuka obecna konfiguracja
         rules = self.mapping.get('mapping', {})
         expected_names.append(rules.get('header', {}).get('P_1', {}).get('value'))
         expected_names.append(rules.get('header', {}).get('P_2', {}).get('value'))
@@ -52,23 +58,52 @@ class StandaloneMapper:
         expected_names.append(rules.get('items', {}).get('anchor_range'))
         
         for exp in set(expected_names):
-            if exp and exp in global_names:
+            if not exp: continue
+            if exp in all_found_names:
                 print(f"  [OK] Znalazłem wymagane pole: '{exp}'")
-            elif exp:
+            elif exp == "note_title" and "note_tile" in all_found_names:
+                print(f"  [OK] Znalazłem pole: 'note_tile' (obsługuję jako 'note_title')")
+            else:
                 print(f"  [BRAK!] Nie znalazłem pola: '{exp}'")
         
         print("="*40 + "\n")
 
     def get_value_by_name(self, wb, name):
         """Pobiera wartość z nazwanego zakresu (globalnego lub lokalnego)."""
+        # 1. Próba znalezienia nazwy globalnej
         d_name = wb.defined_names.get(name)
+        
+        # 2. Próba znalezienia nazwy lokalnej w arkuszach
         if not d_name:
+            for sheet in wb.worksheets:
+                if name in sheet.defined_names:
+                    d_name = sheet.defined_names.get(name)
+                    break
+        
+        if not d_name:
+            # Specjalna obsługa literówki w nazwie 'note_title' / 'note_tile'
+            if name == "note_title":
+                return self.get_value_by_name(wb, "note_tile")
             return None
         
-        dest = list(d_name.destinations)[0] # Arkusz, Komórka
-        sheet = wb[dest[0]]
-        coord = dest[1].replace('$', '')
-        return sheet[coord].value
+        try:
+            dest = list(d_name.destinations)[0] # Arkusz, Komórka
+            sheet = wb[dest[0]]
+            coord = dest[1].replace('$', '')
+            return sheet[coord].value
+        except Exception as e:
+            print(f"  [!] Błąd pobierania wartości dla '{name}': {e}")
+            return None
+
+    def get_anchor_range(self, wb, name):
+        """Pobiera zakres nazwany (globalny lub lokalny) dla kotwicy."""
+        d_name = wb.defined_names.get(name)
+        if not d_name:
+            for sheet in wb.worksheets:
+                if name in sheet.defined_names:
+                    d_name = sheet.defined_names.get(name)
+                    break
+        return d_name
 
     def parse_recipient_info(self, raw_text):
         """Rozbija multiline text na NIP, Nazwę i Adres."""
@@ -184,7 +219,7 @@ class StandaloneMapper:
         total_netto = 0
         total_vat = 0
         
-        anchor = wb.defined_names.get(rules['items']['anchor_range'])
+        anchor = self.get_anchor_range(wb, rules['items']['anchor_range'])
         if anchor:
             dest = list(anchor.destinations)[0]
             ws = wb[dest[0]]
