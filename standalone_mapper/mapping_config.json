@@ -1,6 +1,5 @@
 {
     "pattern_name": "ACC_Pattern_Ref_D5",
-    "description": "Wzorzec referencyjny ACC-3 na podstawie pliku D5",
     "mapping": {
         "header": {
             "KodWaluty": {
