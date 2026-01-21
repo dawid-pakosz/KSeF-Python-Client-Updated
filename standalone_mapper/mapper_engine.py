@@ -16,16 +16,48 @@ class StandaloneMapper:
         self.ns = {None: "http://crd.gov.pl/wzor/2025/06/25/13775/"}
 
     def survey_excel(self, wb):
-        """Wypisuje wszystkie znalezione nazwane zakresy dla użytkownika."""
-        print("\n--- ZWIAD NAZWANYCH ZAKRESÓW ---")
-        found = False
-        # W nowszych wersjach openpyxl defined_names zachowuje się jak słownik
-        for name in wb.defined_names.keys():
-            print(f"[*] Znaleziono zakres: '{name}'")
-            found = True
-        if not found:
-            print("[!] Nie znaleziono żadnych nazwanych zakresów w tym pliku!")
-        print("--------------------------------\n")
+        """Wypisuje wszystkie znalezone nazwane zakresy (globalne i lokalne) dla użytkownika."""
+        print("\n" + "="*40)
+        print("          ZWIAD NAZWANYCH ZAKRESÓW")
+        print("="*40)
+        
+        # 1. Sprawdzamy nazwy globalne (zeszytowe)
+        print("\n[NAZWY GLOBALNE]:")
+        global_names = []
+        for name, defn in wb.defined_names.items():
+            try:
+                dest = list(defn.destinations)
+                for sheetname, address in dest:
+                    print(f"  [*] '{name}' -> Arkusz: {sheetname}, Komórka: {address}")
+                    global_names.append(name)
+            except:
+                print(f"  [?] '{name}' (błąd odczytu adresu)")
+
+        # 2. Sprawdzamy nazwy lokalne (arkuszowe)
+        print("\n[NAZWY LOKALNE (ARKUSZOWE)]:")
+        for sheet in wb.worksheets:
+            if sheet.defined_names:
+                for name, defn in sheet.defined_names.items():
+                    print(f"  [*] '{name}' (w arkuszu {sheet.title})")
+
+        # 3. Weryfikacja z konfiguracją mapowania
+        print("\n" + "-"*40)
+        print("WERYFIKACJA Z TWOIM PLIKEIM mapping_config.json:")
+        expected_names = []
+        # Wyciągamy nazwy, których szuka obecna konfiguracja
+        rules = self.mapping.get('mapping', {})
+        expected_names.append(rules.get('header', {}).get('P_1', {}).get('value'))
+        expected_names.append(rules.get('header', {}).get('P_2', {}).get('value'))
+        expected_names.append(rules.get('buyer', {}).get('FullBlock', {}).get('value'))
+        expected_names.append(rules.get('items', {}).get('anchor_range'))
+        
+        for exp in set(expected_names):
+            if exp and exp in global_names:
+                print(f"  [OK] Znalazłem wymagane pole: '{exp}'")
+            elif exp:
+                print(f"  [BRAK!] Nie znalazłem pola: '{exp}'")
+        
+        print("="*40 + "\n")
 
     def get_value_by_name(self, wb, name):
         """Pobiera wartość z nazwanego zakresu (globalnego lub lokalnego)."""
