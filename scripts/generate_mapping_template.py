@@ -42,5 +42,5 @@ def generate_template(output_path):
 
 if __name__ == "__main__":
     # Używamy ścieżki w resources
-    path = r"c:\Users\Admin\Desktop\Dudek\Python\Projekty\KSeF-Python-Client-V9_Kopia_Toola_z_modulem_Wiz_Po_Poprawkach_1\resources\templates\mapping_template_ACC1.xlsx"
+    path = r"c:\Users\Admin\path\mapping_template_ACC1.xlsx"
     generate_template(path)
