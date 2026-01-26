@@ -14,8 +14,14 @@ class Config(configparser.ConfigParser):
     def __init__(self, firma:int=1, osoba:bool=False, initialize:bool=False):
         super().__init__()
         
-        # Get project root (2 levels up from src/ksef_client/utils)
-        self.project_root = Path(__file__).parent.parent.parent.parent.absolute()
+        # Determine root path (handles both source run and PyInstaller frozen state)
+        if getattr(sys, 'frozen', False):
+            # If frozen (exe), root is where the executable is
+            self.project_root = Path(sys.executable).parent
+        else:
+            # Get project root (2 levels up from src/ksef_client/utils)
+            self.project_root = Path(__file__).parent.parent.parent.parent.absolute()
+
         self.config_dir = self.project_root / 'config'
         self.storage_dir = self.project_root / 'storage'
         self.resources_dir = self.project_root / 'resources'

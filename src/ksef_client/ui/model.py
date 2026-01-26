@@ -131,9 +131,8 @@ class KSeFModel:
             return None
             
         try:
-            # Determine path to technical_rules.json
-            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-            rules_path = os.path.join(project_root, "resources", "technical_rules.json")
+            # Use path from config which handles frozen state
+            rules_path = os.path.join(self.config.resources_dir, "technical_rules.json")
             
             if not os.path.exists(rules_path):
                 self.log(f"❌ Error: Rules file not found at {rules_path}", "ERROR")
@@ -161,8 +160,7 @@ class KSeFModel:
             
         try:
             # Re-init mapper (could be optimized to single instance if rules don't change)
-            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-            rules_path = os.path.join(project_root, "resources", "technical_rules.json")
+            rules_path = os.path.join(self.config.resources_dir, "technical_rules.json")
             mapper = TemplateMapper(rules_path)
             
             output_xml = excel_path.replace('.xlsx', '_mapped.xml')
