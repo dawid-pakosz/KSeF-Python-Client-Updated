@@ -38,6 +38,7 @@ class NavButton(ctk.CTkButton):
 
 class Sidebar(ctk.CTkFrame):
     def __init__(self, master, callbacks, **kwargs):
+        env_text = kwargs.pop("env", "TEST").upper()
         super().__init__(master, corner_radius=0, fg_color=("gray95", "gray5"), **kwargs)
         
         self.logo_frame = ctk.CTkFrame(self, height=HEADER_HEIGHT, corner_radius=0, fg_color="transparent")
@@ -67,12 +68,20 @@ class Sidebar(ctk.CTkFrame):
         self.bottom_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.bottom_frame.pack(side="bottom", fill="x", pady=10)
 
+        
+        
+
         self.btn_login = NavButton(self.bottom_frame, text="Login / Open Session", icon_text="🔑", 
                                    command=callbacks['session_actions']['login'])
-        self.btn_login.pack(fill="x", pady=(20, 0))
+        self.btn_login.pack(fill="x", pady=(5, 0))
 
         self.theme_btn = NavButton(self.bottom_frame, text="Toggle Theme", icon_text="🌓", command=self.toggle_theme)
         self.theme_btn.pack(fill="x")
+
+        # Show Environment
+        color = "#dc3545" if "prod" in env_text else "#28a745" if "test" in env_text else "gray"
+        self.env_label = ctk.CTkLabel(self.bottom_frame, text=f"ENV: {env_text}", font=("Segoe UI", 12, "bold"), text_color=color)
+        self.env_label.pack(side="top", pady=(0, 5))
 
     def set_active_tab(self, tab_name):
         ACTIVE_BG = "#0066cc"
@@ -188,26 +197,122 @@ class SalesView(ctk.CTkFrame):
         self.toolbar = ctk.CTkFrame(self, height=60, fg_color="transparent")
         self.toolbar.pack(fill="x", padx=25, pady=(20, 15))
 
-        self.btn_convert = ctk.CTkButton(self.toolbar, text="Excel -> XML", command=callbacks['convert'], corner_radius=8, fg_color=BTN_COLOR, hover_color=BTN_HOVER)
-        self.btn_convert.pack(side="left", padx=5)
+        self.btn_import = ctk.CTkButton(self.toolbar, text="1. Import XLSX", command=callbacks['import'], corner_radius=8, width=120, fg_color=BTN_COLOR, hover_color=BTN_HOVER)
+        self.btn_import.pack(side="left", padx=5)
 
-        self.btn_send = ctk.CTkButton(self.toolbar, text="Send XML", command=callbacks['send_xml'], corner_radius=8, fg_color=BTN_COLOR, hover_color=BTN_HOVER)
+        self.btn_remove = ctk.CTkButton(self.toolbar, text="Usuń", command=callbacks['remove'], corner_radius=8, width=60, fg_color="#dc3545", hover_color="#c82333")
+        self.btn_remove.pack(side="left", padx=5)
+
+        self.btn_generate = ctk.CTkButton(self.toolbar, text="2. Generuj XML", command=callbacks['generate'], corner_radius=8, width=120, fg_color=BTN_COLOR, hover_color=BTN_HOVER)
+        self.btn_generate.pack(side="left", padx=5)
+
+        self.btn_send = ctk.CTkButton(self.toolbar, text="3. Wyślij (KSeF)", command=callbacks['send_xml'], corner_radius=8, width=120, fg_color=BTN_COLOR, hover_color=BTN_HOVER)
         self.btn_send.pack(side="left", padx=5)
 
-        self.btn_upo = ctk.CTkButton(self.toolbar, text="Check UPO", command=callbacks['check_upo'], corner_radius=8, fg_color=BTN_COLOR, hover_color=BTN_HOVER)
+        self.btn_upo = ctk.CTkButton(self.toolbar, text="UPO", command=callbacks['check_upo'], corner_radius=8, width=60, fg_color="#6c757d", hover_color="#5a6268")
         self.btn_upo.pack(side="left", padx=5)
 
-        self.btn_viz = ctk.CTkButton(self.toolbar, text="Preview", command=callbacks['preview'], corner_radius=8, fg_color=BTN_COLOR, hover_color=BTN_HOVER)
+        self.btn_viz = ctk.CTkButton(self.toolbar, text="Podgląd", command=callbacks['preview'], corner_radius=8, width=80, fg_color="#17a2b8", hover_color="#138496")
         self.btn_viz.pack(side="left", padx=5)
 
         self.combo_mapping = ctk.CTkOptionMenu(self.toolbar, values=mapping_templates, width=200, corner_radius=8)
         self.combo_mapping.pack(side="right", padx=5)
 
-        self.table_container = ctk.CTkScrollableFrame(self, corner_radius=10, border_width=1, border_color=("gray85", "gray20"))
+        self.table_container = ctk.CTkFrame(self, corner_radius=10, border_width=1, border_color=("gray85", "gray20"))
         self.table_container.pack(fill="both", expand=True, padx=30, pady=10)
         
-        self.table_label = ctk.CTkLabel(self.table_container, text="[ List of sent invoices will appear here ]", font=FONT_UI, text_color="gray")
-        self.table_label.pack(expand=True, pady=100)
+        # Setup Treeview Styles (shared helper)
+        setup_treeview_styles()
+
+        # Define Columns
+        self.columns = (
+            "status", "file", "template",
+            "p1_nip", "p1_country", "p1_name", "p1_addr",
+            "p2_nip", "p2_country", "p2_name", "p2_jst", "p2_gv",
+            "inv_no", "date_issued", "date_service", "curr",
+            "net", "vat", "gross",
+            "payment", "footer"
+        )
+        
+        self.tree = ttk.Treeview(self.table_container, columns=self.columns, show="headings", selectmode="extended")
+        
+        # Headings
+        headers = {
+            "status": "STATUS", "file": "Plik", "template": "Szablon",
+            "p1_nip": "Sprzedawca NIP", "p1_country": "Sprzedawca Kod Kr.", "p1_name": "Sprzedawca Nazwa", "p1_addr": "Sprzedawca Adres",
+            "p2_nip": "Nabywca NIP", "p2_country": "Nabywca Kod Kr.", "p2_name": "Nabywca Nazwa", "p2_jst": "Nabywca JST", "p2_gv": "Nabywca GV",
+            "inv_no": "Nr Faktury", "date_issued": "Data Wyst.", "date_service": "Data Usł.", "curr": "Waluta",
+            "net": "Netto", "vat": "VAT", "gross": "Brutto",
+            "payment": "Płatność", "footer": "Stopka"
+        }
+        
+        for col, title in headers.items():
+            self.tree.heading(col, text=title)
+            
+        # Column Configuration (Widths)
+        self.tree.column("status", width=100, anchor="center", stretch=False)
+        self.tree.column("file", width=150, anchor="w", stretch=False)
+        self.tree.column("template", width=150, anchor="w", stretch=False)
+        
+        self.tree.column("p1_nip", width=100, anchor="w", stretch=False)
+        self.tree.column("p1_country", width=50, anchor="center", stretch=False)
+        self.tree.column("p1_name", width=150, anchor="w", stretch=False)
+        self.tree.column("p1_addr", width=200, anchor="w", stretch=False)
+        
+        self.tree.column("p2_nip", width=100, anchor="w", stretch=False)
+        self.tree.column("p2_country", width=50, anchor="center", stretch=False)
+        self.tree.column("p2_name", width=150, anchor="w", stretch=False)
+        self.tree.column("p2_jst", width=50, anchor="center", stretch=False)
+        self.tree.column("p2_gv", width=50, anchor="center", stretch=False)
+        
+        self.tree.column("inv_no", width=120, anchor="w", stretch=False)
+        self.tree.column("date_issued", width=90, anchor="center", stretch=False)
+        self.tree.column("date_service", width=90, anchor="center", stretch=False)
+        self.tree.column("curr", width=50, anchor="center", stretch=False)
+        
+        self.tree.column("net", width=90, anchor="e", stretch=False)
+        self.tree.column("vat", width=80, anchor="e", stretch=False)
+        self.tree.column("gross", width=90, anchor="e", stretch=False)
+        
+        self.tree.column("payment", width=100, anchor="w", stretch=False)
+        self.tree.column("footer", width=150, anchor="w", stretch=False)
+
+        # Scrollbars
+        self.vsb = ctk.CTkScrollbar(self.table_container, orientation="vertical", command=self.tree.yview)
+        self.hsb = ctk.CTkScrollbar(self.table_container, orientation="horizontal", command=self.tree.xview)
+        self.tree.configure(yscrollcommand=self.vsb.set, xscrollcommand=self.hsb.set)
+
+        # Grid Layout
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        self.vsb.grid(row=0, column=1, sticky="ns", padx=(1, 0))
+        self.hsb.grid(row=1, column=0, sticky="ew", pady=(1, 0))
+        
+        self.table_container.grid_rowconfigure(0, weight=1)
+        self.table_container.grid_columnconfigure(0, weight=1)
+
+    def update_table(self, data_list):
+        """
+        data_list: List of tuples matching the columns
+        """
+        # Refresh styles
+        setup_treeview_styles()
+        
+        # Clear current
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+            
+        if not data_list:
+            return
+
+        # Insert new
+        for i, row in enumerate(data_list):
+            tag = 'even' if i % 2 == 0 else 'odd'
+            self.tree.insert("", "end", values=row, tags=(tag,))
+        
+        # Zebra striping
+        row_even, row_odd = setup_treeview_styles() # Get colors
+        self.tree.tag_configure('even', background=row_even)
+        self.tree.tag_configure('odd', background=row_odd)
 
 class PurchasesView(ctk.CTkFrame):
     def __init__(self, master, callbacks, **kwargs):
@@ -384,7 +489,7 @@ class KSeFViewV4(ctk.CTk):
         self.grid_rowconfigure(0, weight=0)
         self.grid_rowconfigure(1, weight=1)
 
-        self.sidebar = Sidebar(self, callbacks, width=SIDEBAR_WIDTH)
+        self.sidebar = Sidebar(self, callbacks, width=SIDEBAR_WIDTH, env=model.config.version)
         self.sidebar.grid(row=0, column=0, rowspan=2, sticky="nsew")
 
         self.header = TopHeader(self, model)

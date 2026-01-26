@@ -3,6 +3,8 @@ import os
 
 # Dodaj src do path, aby można było importować ksef_client
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+# Dodaj project_root do path, aby można było importować standalone_mapper
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 try:
     from ksef_client.ui.controller import KSeFController

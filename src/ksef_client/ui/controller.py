@@ -22,7 +22,9 @@ class KSeFController:
             },
             
             "sales_actions": {
-                "convert": self.handle_convert_excel,
+                "import": self.handle_import_excel,
+                "remove": self.handle_remove_selected,
+                "generate": self.handle_generate_xml,
                 "send_xml": self.handle_send_xml,
                 "check_upo": self.handle_check_upo,
                 "preview": self.handle_preview
@@ -133,33 +135,213 @@ class KSeFController:
         threading.Thread(target=task).start()
 
     # --- SALES ACTIONS ---
-    def handle_convert_excel(self):
-        file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx")], title="Select Excel file to convert")
-        if file_path:
-            template = self.view.views['sales'].combo_mapping.get()
-            def task():
-                self.model.convert_excel_to_xml(file_path, template)
-                self.refresh_ui()
-                messagebox.showinfo("Success", f"Converted using {template}\n(Mapping engine in progress)")
-            threading.Thread(target=task).start()
+    def handle_import_excel(self):
+        file_paths = filedialog.askopenfilenames(filetypes=[("Excel files", "*.xlsx")], title="Wybierz faktury Excel")
+        if not file_paths:
+            return
+
+        sales_view = self.view.views['sales']
+        template = sales_view.combo_mapping.get()
+
+        def task():
+            new_items_count = 0
+            for file_path in file_paths:
+                # Load data using Model -> TemplateMapper
+                data = self.model.load_excel_preview(file_path, template)
+                
+                if data and data['status'] != "BŁĄD":
+                    self.model.sales_invoices.append(data)
+                    new_items_count += 1
+                else:
+                    self.model.log(f"Pominięto plik (błąd): {os.path.basename(file_path)}", "ERROR")
+            
+            if new_items_count > 0:
+                view_data = self._prepare_sales_view_data()
+                sales_view.update_table(view_data)
+                self.model.log(f"Zaimportowano plików: {new_items_count}")
+            else:
+                messagebox.showwarning("Brak danych", "Nie udało się zaimportować żadnego pliku.")
+
+        threading.Thread(target=task).start()
+
+    def handle_remove_selected(self):
+        sales_view = self.view.views['sales']
+        selected_items = sales_view.tree.selection()
+        
+        if not selected_items:
+            return
+            
+        # Confirm
+        if not messagebox.askyesno("Potwierdzenie", f"Czy na pewno usunąć zaznaczone faktury ({len(selected_items)})?"):
+            return
+
+        # Treeview returns IIDs. In our case (check update_table), we insert with default IIDs.
+        # However, update_table recreates items, so IIDs might change. 
+        # But `tree.index(item)` gives the position match. 
+        # If we assume Table visual order == Model order (no sorting active), we can use indices.
+        
+        indices_to_remove = []
+        for item in selected_items:
+            idx = sales_view.tree.index(item)
+            indices_to_remove.append(idx)
+            
+        # Sort descending to remove without shifting
+        indices_to_remove.sort(reverse=True)
+        
+        removed_count = 0
+        for idx in indices_to_remove:
+            if 0 <= idx < len(self.model.sales_invoices):
+                del self.model.sales_invoices[idx]
+                removed_count += 1
+                
+        # Refresh
+        sales_view.update_table(self._prepare_sales_view_data())
+        self.model.log(f"Usunięto faktur: {removed_count}")
+
+    def handle_generate_xml(self):
+        # 1. Check if there are items
+        if not self.model.sales_invoices:
+            messagebox.showwarning("Brak danych", "Najpierw zaimportuj pliki Excel.")
+            return
+            
+        # 2. Iterate and generate
+        def task():
+            count = 0
+            for item in self.model.sales_invoices:
+                if item['status'] not in ["NOWA", "ZAŁADOWANY"]:
+                    continue # Skip already generated or sent
+                    
+                path = item['file']
+                template = item['template']
+                
+                # Generate XML
+                xml_path = self.model.generate_xml_from_file(path, template)
+                
+                if xml_path:
+                    item['status'] = "XML_GOTOWY"
+                    item['xml_path'] = xml_path
+                    count += 1
+            
+            if count > 0:
+                self.view.views['sales'].update_table(self._prepare_sales_view_data())
+                self.model.log(f"Wygenerowano XML dla {count} faktur.")
+                messagebox.showinfo("Sukces", f"Wygenerowano plików XML: {count}")
+            else:
+                self.model.log("Brak nowych faktur do przetworzenia.")
+
+        threading.Thread(target=task).start()
+
+    def _prepare_sales_view_data(self):
+        """Helper to format model data for view"""
+        view_data = []
+        for item in self.model.sales_invoices:
+            try:
+                row = (
+                    item['status'],
+                    os.path.basename(item['file']),
+                    item['template'],
+                    item['p1'].get('nip', ''), item['p1'].get('country', ''), item['p1'].get('name', ''), item['p1'].get('addr', ''),
+                    item['p2'].get('nip', ''), item['p2'].get('country', ''), item['p2'].get('name', ''), item['p2'].get('jst', ''), item['p2'].get('gv', ''),
+                    item['inv'].get('no', ''), item['inv'].get('date_issued', ''), item['inv'].get('date_service', ''), item['inv'].get('curr', ''),
+                    item['inv'].get('net', ''), item['inv'].get('vat', ''), item['inv'].get('gross', ''),
+                    item['payment'], item['footer']
+                )
+                view_data.append(row)
+            except Exception as e:
+                print(f"Error mapping item to row: {e}")
+        return view_data
+            # file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx")], title="Select Excel file to convert")
+            # if file_path:
+            #     template = self.view.views['sales'].combo_mapping.get()
+            #     def task():
+            #         self.model.convert_excel_to_xml(file_path, template)
+            #         self.refresh_ui()
+            #         messagebox.showinfo("Success", f"Converted using {template}\n(Mapping engine in progress)")
+            #     threading.Thread(target=task).start()
 
     def handle_send_xml(self):
-        file_path = filedialog.askopenfilename(filetypes=[("XML files", "*.xml")], title="Select XML invoice to send")
-        if file_path:
-            def task():
-                if self.model.send_xml_invoice(file_path):
-                    self.refresh_ui()
-                    messagebox.showinfo("Success", "Invoice sent to KSeF.")
-                self.refresh_ui()
-            threading.Thread(target=task).start()
+        # 1. Check session
+        if not self.model.is_logged_in:
+            messagebox.showwarning("Brak sesji", "Musisz być zalogowany do KSeF (Step 0: Login), aby wysłać faktury.")
+            return
+
+        # 2. Check for sendable items
+        sendable_items = [i for i in self.model.sales_invoices if i.get('status') == 'XML_GOTOWY']
+        if not sendable_items:
+            messagebox.showinfo("Info", "Brak faktur gotowych do wysyłki (Status: XML_GOTOWY).")
+            return
+
+        # 3. Batch send task
+        def task():
+            success_count = 0
+            fail_count = 0
+            
+            for item in sendable_items:
+                xml_path = item.get('xml_path')
+                if not xml_path or not os.path.exists(xml_path):
+                    item['status'] = "BŁĄD PLIKU"
+                    fail_count += 1
+                    continue
+                
+                # Send
+                if self.model.send_xml_invoice(xml_path):
+                    item['status'] = "WYSŁANA"
+                    # Capture ref number if model stores it (currently send_xml_invoice logs it, 
+                    # ideally it should return it. Let's assume boolean return for now).
+                    # TODO: Enhance model to return ref_no to store in item['ksef_ref']
+                    success_count += 1
+                else:
+                    item['status'] = "BŁĄD WYSYŁKI"
+                    fail_count += 1
+            
+            # Refresh UI
+            self.view.views['sales'].update_table(self._prepare_sales_view_data())
+            
+            # Summary
+            if fail_count == 0:
+                self.model.log(f"✅ Pomyślnie wysłano: {success_count} faktur.")
+                messagebox.showinfo("Sukces", f"Wysłano {success_count} faktur do KSeF.")
+            else:
+                self.model.log(f"⚠️ Wysłano: {success_count}, Błędy: {fail_count}.", "WARNING")
+                messagebox.showwarning("Raport wysyłki", f"Sukces: {success_count}\nBłędy: {fail_count}\nSprawdź logi.")
+
+        threading.Thread(target=task).start()
 
     def handle_check_upo(self):
-        file_path = filedialog.askopenfilename(filetypes=[("XML files", "*.xml")], title="Select XML file to check UPO")
-        if file_path:
-            def task():
-                self.model.check_status_upo(file_path)
+        sales_view = self.view.views['sales']
+        selected_items = sales_view.tree.selection()
+        
+        if not selected_items:
+            # If nothing selected, maybe fallback to file dialog? Or just warn.
+            # Let's fallback to file dialog for flexibility, or warn. 
+            # User workflow: Select sent invoice -> Check UPO.
+            file_path = filedialog.askopenfilename(filetypes=[("XML files", "*.xml")], title="Wybierz plik XML do sprawdzenia UPO")
+            if not file_path:
+                return
+            xml_path = file_path
+        else:
+            # Get first selected
+            item_idx = sales_view.tree.index(selected_items[0])
+            if item_idx < len(self.model.sales_invoices):
+                item = self.model.sales_invoices[item_idx]
+                xml_path = item.get('xml_path')
+                if not xml_path:
+                    messagebox.showwarning("Info", "Ta pozycja nie ma wygenerowanego pliku XML.")
+                    return
+            else:
+                return
+
+        def task():
+            if self.model.check_status_upo(xml_path):
+                # Update status if successful (logic mainly resides in model logs for now, 
+                # but technically we could update item['status'] to 'PRZYJĘTA' if model returned specific status)
                 self.refresh_ui()
-            threading.Thread(target=task).start()
+                messagebox.showinfo("Sukces", "Pobrano UPO (szczegóły w logach).")
+            else:
+                self.refresh_ui()
+                messagebox.showerror("Błąd", "Nie udało się pobrać UPO.")
+        
+        threading.Thread(target=task).start()
 
     def handle_preview(self):
         file_path = filedialog.askopenfilename(filetypes=[("XML files", "*.xml")], title="Select XML file for visualization")

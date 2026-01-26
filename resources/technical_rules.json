@@ -1,0 +1,38 @@
+{
+    "protocol_version": "3.0",
+    "ksef_schema": "FA (3)",
+    "system_defaults": {
+        "KodFormularza": "FA",
+        "kodSystemowy": "FA (3)",
+        "wersjaSchemy": "1-0E",
+        "WariantFormularza": 3
+    },
+    "podmiot1_static": {
+        "PrefiksPodatnika": "PL",
+        "NIP": "1112223334",
+        "Nazwa": "Moja Firma Sp. z o.o.",
+        "KodKraju": "PL",
+        "AdresL1": "ul. Przykładowa 1, 00-001 Warszawa",
+        "StopkaFaktury": "Moja Firma Sp. z o.o., ul. Przykładowa 1, 00-001 Warszawa, NIP 1112223334, KRS 0000123456"
+    },
+    "default_annotations": {
+        "P_16": "2",
+        "P_17": "2",
+        "P_18": "2",
+        "P_18A": "2",
+        "P_23": "2"
+    },
+    "vat_rules": {
+        "exempt_rate_label": "zw",
+        "default_exempt_basis": "art. 43 ust. 1 pkt 28 ustawy o podatku od towarów i usług"
+    },
+    "named_ranges_standard": {
+        "invoice_no": "FV_Numer",
+        "date_issue": "FV_Data_Wystawienia",
+        "date_sale": "FV_Data_Sprzedazy",
+        "buyer_name": "Nabywca_Nazwa",
+        "buyer_nip": "Nabywca_NIP",
+        "item_net": "Wiersz_Netto",
+        "item_vat_rate": "Wiersz_VAT"
+    }
+}

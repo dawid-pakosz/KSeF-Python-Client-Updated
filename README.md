@@ -89,6 +89,17 @@ python scripts/ksef_tool.py 1 f viz storage/received/xml/faktura.xml --lang pl
 python scripts/ksef_tool.py 1 f viz storage/received/xml/faktura.xml --theme corporate --ksef-no 123-ABC-01
 ```
 
+### 5. Konwersja Excel -> XML (ACC Mapper)
+Niezależne narzędzie dla księgowości do zamiany faktur Excel na XML FA(3).
+
+```bash
+# 1. Faktury Wielowalutowe (ACC_MULTI) - z obsługą kursów walut
+python standalone_mapper/run_mapper.py sciezka/do/pliku.xlsx --type ACC_MULTI
+
+# 2. Faktury PLN Proste (ACC_PLN_PROSTA) - standardowe
+python standalone_mapper/run_mapper.py sciezka/do/pliku.xlsx --type ACC_PLN_PROSTA
+```
+
 ## Porządki
 - Stare skrypty `t-XX` zostały przeniesione do `scripts/legacy/`.
 - Wygenerowane wizualizacje HTML trafiają do folderów `viz/` wewnątrz `storage/sent/` lub `storage/received/`.

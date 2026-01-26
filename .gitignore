@@ -17,7 +17,7 @@ storage/**
 *.zip
 
 # Keep project config but ignore personal overrides if needed
-# config/ksef.ini
+config/ksef.ini
 # config/ksef.yaml
 
 # Legacy
@@ -28,4 +28,10 @@ andesive
 PROJECT_GUIDE.md
 PROJECT_OVERVIEW.md
 walkthrough.md
+# Sensitive data folders
 wzory/
+wzory/**
+excel_input/
+excel_input/**
+standalone_mapper/excel_input/
+standalone_mapper/excel_input/**

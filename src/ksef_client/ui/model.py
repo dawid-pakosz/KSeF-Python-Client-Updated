@@ -1,9 +1,15 @@
 import time
+import os
 from ksef_client.utils.ksefconfig import Config
 from ksef_client.services.auth_service import AuthService
 from ksef_client.services.invoice_service import InvoiceService
 from ksef_client.services.query_service import QueryService
 from ksef_client.services.export_service import ExportService
+try:
+    from standalone_mapper.template_mapper import TemplateMapper
+except ImportError:
+    TemplateMapper = None
+    print("Warning: Could not import standalone_mapper. Excel loading will fail.")
 
 class KSeFModel:
     def __init__(self):
@@ -29,12 +35,9 @@ class KSeFModel:
         
         self.available_themes = ["darkly", "flatly", "cosmo", "superhero", "journal", "pulse", "sandstone", "united"]
         self.mapping_templates = [
-            "Standard Template (V1)",
-            "Export Template (V2)",
-            "Service Template (V3)",
-            "Correction Template (V4)",
-            "Proforma Template (V5)",
-            "Special Template (V6)"
+            "ACC_PLN_PROSTA",
+            "ACC_MULTI",
+            "ACC_EUR"
         ]
         
         self.logs = []
@@ -120,12 +123,57 @@ class KSeFModel:
             self.log(f"❌ Logout error: {str(e)}", "ERROR")
             return False
 
-    def convert_excel_to_xml(self, excel_path, template):
-        self.log(f"Converting: {excel_path} using {template}...")
-        # Future Excel -> XML mapping module
-        time.sleep(1.5)
-        self.log(f"✅ Generated XML for {excel_path}.")
-        return True
+    def load_excel_preview(self, excel_path, template):
+        self.log(f"Loading Excel preview: {excel_path} ({template})...")
+        
+        if not TemplateMapper:
+            self.log("❌ Error: TemplateMapper module not available.", "ERROR")
+            return None
+            
+        try:
+            # Determine path to technical_rules.json
+            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+            rules_path = os.path.join(project_root, "resources", "technical_rules.json")
+            
+            if not os.path.exists(rules_path):
+                self.log(f"❌ Error: Rules file not found at {rules_path}", "ERROR")
+                return None
+                
+            mapper = TemplateMapper(rules_path)
+            data = mapper.extract_data(excel_path, template)
+            
+            if data['status'] == "BŁĄD":
+                self.log(f"❌ Extraction failed for {excel_path}", "ERROR")
+            else:
+                self.log(f"✅ Loaded data for {excel_path}")
+                
+            return data
+            
+        except Exception as e:
+            self.log(f"❌ Load error: {str(e)}", "ERROR")
+            return None
+
+    def generate_xml_from_file(self, excel_path, template):
+        self.log(f"Generating XML for: {os.path.basename(excel_path)}...")
+        
+        if not TemplateMapper:
+            return None
+            
+        try:
+            # Re-init mapper (could be optimized to single instance if rules don't change)
+            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+            rules_path = os.path.join(project_root, "resources", "technical_rules.json")
+            mapper = TemplateMapper(rules_path)
+            
+            output_xml = excel_path.replace('.xlsx', '_mapped.xml')
+            generated_path = mapper.create_xml(excel_path, output_xml, mapping_type=template)
+            
+            self.log(f"✅ Generated: {os.path.basename(generated_path)}")
+            return generated_path
+            
+        except Exception as e:
+            self.log(f"❌ Generation error: {str(e)}", "ERROR")
+            return None
 
     def send_xml_invoice(self, xml_path):
         if not self.is_logged_in:

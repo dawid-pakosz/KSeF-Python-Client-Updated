@@ -23,14 +23,8 @@ class InvoiceService:
         self.cfg = cfg
         self.auth_file = f"{cfg.prefix_full}-auth.json"
         self.session_file = f"{cfg.prefix_full}-session.json"
-
-    def log(self, message, level="INFO"):
-        """Central logging for the service, pipes to config callback if exists."""
-        if hasattr(self.cfg, 'log_callback') and self.cfg.log_callback:
-            self.cfg.log_callback(message, level)
-        else:
-            print(f"[{level}] {message}")
         
+        # Inicjalizacja danych sesyjnych i tokenu
         if not os.path.exists(self.auth_file):
             raise KSeFError(f"Missing auth file: {self.auth_file}")
 
@@ -39,6 +33,13 @@ class InvoiceService:
 
         self.access_token = self.auth["accessToken"]["token"]
         self.session = self._load_or_init_session()
+
+    def log(self, message, level="INFO"):
+        """Central logging for the service, pipes to config callback if exists."""
+        if hasattr(self.cfg, 'log_callback') and self.cfg.log_callback:
+            self.cfg.log_callback(message, level)
+        else:
+            print(f"[{level}] {message}")
 
     def _load_or_init_session(self):
         if os.path.exists(self.session_file):
