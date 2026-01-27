@@ -40,8 +40,7 @@ class KSeFController:
         
         self.view = KSeFViewV4(callbacks, self.model)
         self.refresh_ui()
-        
-        self.refresh_ui()
+
 
     def run(self):
         self.view.mainloop()
@@ -54,9 +53,7 @@ class KSeFController:
 
     def handle_view_switch(self, view_name):
         self.view.show_view(view_name)
-        self.model.log(f"Przełączono widok na: {view_name}")
-        self.refresh_ui()
-
+        self.model.log(f"View switched to: {view_name}", level="DEBUG")
         self.refresh_ui()
 
     # --- AKCJE SESJI ---
@@ -135,13 +132,12 @@ class KSeFController:
         threading.Thread(target=task).start()
 
     # --- SALES ACTIONS ---
-    def handle_import_excel(self):
+    def handle_import_excel(self, template):
         file_paths = filedialog.askopenfilenames(filetypes=[("Excel files", "*.xlsx")], title="Wybierz faktury Excel")
         if not file_paths:
             return
 
         sales_view = self.view.views['sales']
-        template = sales_view.combo_mapping.get()
 
         def task():
             new_items_count = 0
@@ -153,14 +149,14 @@ class KSeFController:
                     self.model.sales_invoices.append(data)
                     new_items_count += 1
                 else:
-                    self.model.log(f"Pominięto plik (błąd): {os.path.basename(file_path)}", "ERROR")
+                    self.model.log(f"Skipped file (error): {os.path.basename(file_path)}", "ERROR")
             
             if new_items_count > 0:
                 view_data = self._prepare_sales_view_data()
                 sales_view.update_table(view_data)
-                self.model.log(f"Zaimportowano plików: {new_items_count}")
+                self.model.log(f"Imported files: {new_items_count}")
             else:
-                messagebox.showwarning("Brak danych", "Nie udało się zaimportować żadnego pliku.")
+                messagebox.showwarning("No data", "Failed to import any files.")
 
         threading.Thread(target=task).start()
 
@@ -196,7 +192,7 @@ class KSeFController:
                 
         # Refresh
         sales_view.update_table(self._prepare_sales_view_data())
-        self.model.log(f"Usunięto faktur: {removed_count}")
+        self.model.log(f"Removed invoices: {removed_count}")
 
     def handle_generate_xml(self):
         # 1. Check if there are items
@@ -224,10 +220,10 @@ class KSeFController:
             
             if count > 0:
                 self.view.views['sales'].update_table(self._prepare_sales_view_data())
-                self.model.log(f"Wygenerowano XML dla {count} faktur.")
-                messagebox.showinfo("Sukces", f"Wygenerowano plików XML: {count}")
+                self.model.log(f"Generated XML for {count} invoices.")
+                messagebox.showinfo("Success", f"XML files generated: {count}")
             else:
-                self.model.log("Brak nowych faktur do przetworzenia.")
+                self.model.log("No new invoices to process.")
 
         threading.Thread(target=task).start()
 
@@ -299,11 +295,11 @@ class KSeFController:
             
             # Summary
             if fail_count == 0:
-                self.model.log(f"✅ Pomyślnie wysłano: {success_count} faktur.")
-                messagebox.showinfo("Sukces", f"Wysłano {success_count} faktur do KSeF.")
+                self.model.log(f"Successfully sent: {success_count} invoices.")
+                messagebox.showinfo("Success", f"Sent {success_count} invoices to KSeF.")
             else:
-                self.model.log(f"⚠️ Wysłano: {success_count}, Błędy: {fail_count}.", "WARNING")
-                messagebox.showwarning("Raport wysyłki", f"Sukces: {success_count}\nBłędy: {fail_count}\nSprawdź logi.")
+                self.model.log(f"Sent: {success_count}, Errors: {fail_count}.", "WARNING")
+                messagebox.showwarning("Send report", f"Success: {success_count}\nErrors: {fail_count}\nCheck logs.")
 
         threading.Thread(target=task).start()
 
@@ -350,9 +346,9 @@ class KSeFController:
             try:
                 from ksef_client.views.ksef_viz import run_visualization
                 if run_visualization(file_path, theme="corporate"):
-                    self.model.log("✅ Visualization generated.")
+                    self.model.log("Visualization generated.")
             except Exception as e:
-                self.model.log(f"❌ Visualization error: {e}", "ERROR")
+                self.model.log(f"Visualization error: {e}", "ERROR")
             self.refresh_ui()
 
     def handle_sync_purchases(self):
@@ -373,7 +369,7 @@ class KSeFController:
         subject_type = "Subject1" if "Subject1" in ui_type else "Subject2"
         
         def task():
-            self.model.log(f"Inicjowanie pobierania: {ui_type} za ostatnie {days} dni...")
+            self.model.log(f"Initializing fetch: {ui_type} for last {days} days...")
             data = self.model.fetch_purchases(days=days, subject_type=subject_type)
             
             def update_ui():

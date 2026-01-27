@@ -1,8 +1,9 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, ttk, font
 import customtkinter as ctk
 from PIL import Image
 import os
+import sys
 
 # Konfiguracja podstawowa
 ctk.set_appearance_mode("System")
@@ -19,9 +20,54 @@ HEADER_HEIGHT = 85
 SIDEBAR_WIDTH = 285 
 SIDEBAR_PADX = 40 
 
+def get_resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+def load_icon(name, size=(24, 24), h_margin=15):
+    """Loads a PNG icon, generates dark mode version, and adds horizontal margin"""
+    icon_path = os.path.join("resources", "icons", f"{name}.png")
+    if not os.path.exists(icon_path):
+        return None
+    
+    # Load original
+    img_orig = Image.open(icon_path).convert("RGBA")
+    img_orig = img_orig.resize(size, Image.Resampling.LANCZOS)
+    
+    # Create a wider transparent canvas to "pad" the icon from the left
+    canvas_w = size[0] + h_margin
+    canvas_h = size[1]
+    
+    def process_image(img):
+        # Create white version if needed for dark mode
+        # (This is a simplified version of what we had before)
+        r, g, b, a = img.split()
+        white_channel = a.point(lambda _: 255)
+        # Note: We can check if we want white or original. 
+        # But for dark mode we definitely want white.
+        return Image.merge("RGBA", (white_channel, white_channel, white_channel, a))
+
+    img_light_final = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+    img_light_final.paste(img_orig, (h_margin, 0), img_orig)
+    
+    img_dark_pre = process_image(img_orig)
+    img_dark_final = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+    img_dark_final.paste(img_dark_pre, (h_margin, 0), img_dark_pre)
+    
+    return ctk.CTkImage(light_image=img_light_final, dark_image=img_dark_final, size=(canvas_w, canvas_h))
+
 class NavButton(ctk.CTkButton):
-    def __init__(self, master, text, icon_text, command, **kwargs):
-        display_text = f"  {icon_text}   {text}"
+    def __init__(self, master, text, icon_text=None, image=None, command=None, **kwargs):
+        if image:
+            display_text = f" {text}" # Small space after padded image
+        else:
+            display_text = f"  {icon_text}   {text}" if icon_text else text
         
         params = {
             "corner_radius": 0,
@@ -34,54 +80,61 @@ class NavButton(ctk.CTkButton):
         }
         params.update(kwargs)
         
-        super().__init__(master, text=display_text, command=command, **params)
+        super().__init__(master, text=display_text, image=image, command=command, **params)
 
 class Sidebar(ctk.CTkFrame):
-    def __init__(self, master, callbacks, **kwargs):
-        env_text = kwargs.pop("env", "TEST").upper()
+    def __init__(self, master, callbacks, model, **kwargs):
         super().__init__(master, corner_radius=0, fg_color=("gray95", "gray5"), **kwargs)
+        self.model = model
         
         self.logo_frame = ctk.CTkFrame(self, height=HEADER_HEIGHT, corner_radius=0, fg_color="transparent")
         self.logo_frame.pack(fill="x")
         self.logo_frame.pack_propagate(False)
 
-        self.logo_label = ctk.CTkLabel(self.logo_frame, text="KSeF App", font=FONT_TITLE_MAIN)
-        self.logo_label.pack(side="left", padx=SIDEBAR_PADX)
+        # Container for logo and version
+        self.logo_container = ctk.CTkFrame(self.logo_frame, fg_color="transparent")
+        self.logo_container.pack(side="left", padx=SIDEBAR_PADX)
+
+        self.logo_label = ctk.CTkLabel(self.logo_container, text="KSeF App", font=FONT_TITLE_MAIN)
+        self.logo_label.pack(side="top", anchor="w")
+        
+        self.version_label = ctk.CTkLabel(self.logo_container, text=f"ver: {self.model.app_version}", 
+                                         font=("Segoe UI", 11), text_color="gray")
+        self.version_label.pack(side="top", anchor="w")
 
         self.sep = ctk.CTkFrame(self, height=1, fg_color=("gray85", "gray20"))
         self.sep.pack(fill="x")
 
-        self.nav_buttons = {}
+        # Custom Icons
+        icon_send = load_icon("paper-plane", size=(20, 20))
+        icon_inbox = load_icon("inbox", size=(20, 20))
+        icon_home = load_icon("home", size=(20,20))
+        icon_key = load_icon("key", size=(20,20))
+        icon_theme_mode = load_icon("theme", size=(20,20))
         
-        self.btn_dash = NavButton(self, text="Dashboard", icon_text="🏠", command=lambda: callbacks['menu']("session"))
+        self.nav_buttons = {}
+
+        self.btn_dash = NavButton(self, text="Dashboard", image=icon_home, command=lambda: callbacks['menu']("session"))
         self.btn_dash.pack(fill="x", pady=(40, 0))
         self.nav_buttons["session"] = self.btn_dash
 
-        self.btn_sales = NavButton(self, text="Send Invoices", icon_text="📤", command=lambda: callbacks['menu']("sales"))
+
+        self.btn_sales = NavButton(self, text="Send Invoices", image=icon_send, command=lambda: callbacks['menu']("sales"))
         self.btn_sales.pack(fill="x", pady=0)
         self.nav_buttons["sales"] = self.btn_sales
 
-        self.btn_purchases = NavButton(self, text="Received Invoices", icon_text="📥", command=lambda: callbacks['menu']("purchases"))
+        self.btn_purchases = NavButton(self, text="Received Invoices", image=icon_inbox, command=lambda: callbacks['menu']("purchases"))
         self.btn_purchases.pack(fill="x", pady=0)
         self.nav_buttons["purchases"] = self.btn_purchases
 
         self.bottom_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.bottom_frame.pack(side="bottom", fill="x", pady=10)
 
-        
-        
-
-        self.btn_login = NavButton(self.bottom_frame, text="Login / Open Session", icon_text="🔑", 
-                                   command=callbacks['session_actions']['login'])
+        self.btn_login = NavButton(self.bottom_frame, text="Login / Open Session", image=icon_key, command=callbacks['session_actions']['login'])
         self.btn_login.pack(fill="x", pady=(5, 0))
 
-        self.theme_btn = NavButton(self.bottom_frame, text="Toggle Theme", icon_text="🌓", command=self.toggle_theme)
+        self.theme_btn = NavButton(self.bottom_frame, text="Toggle Theme", image=icon_theme_mode, command=self.toggle_theme)
         self.theme_btn.pack(fill="x")
-
-        # Show Environment
-        color = "#dc3545" if "prod" in env_text else "#28a745" if "test" in env_text else "gray"
-        self.env_label = ctk.CTkLabel(self.bottom_frame, text=f"ENV: {env_text}", font=("Segoe UI", 12, "bold"), text_color=color)
-        self.env_label.pack(side="top", pady=(0, 5))
 
     def set_active_tab(self, tab_name):
         ACTIVE_BG = "#0066cc"
@@ -111,8 +164,18 @@ class TopHeader(ctk.CTkFrame):
         self.title_container = ctk.CTkFrame(self, fg_color="transparent")
         self.title_container.pack(side="left", fill="both", expand=True, padx=40)
         
-        self.lbl_title = ctk.CTkLabel(self.title_container, text=f"Witaj!", font=FONT_TITLE_MAIN)
-        self.lbl_title.pack(side="left", expand=False)
+        # User Welcome and Environment Badge
+        self.info_container = ctk.CTkFrame(self.title_container, fg_color="transparent")
+        self.info_container.pack(side="left", fill="y", pady=15)
+
+        self.lbl_title = ctk.CTkLabel(self.info_container, text=f"Witaj!", font=FONT_TITLE_MAIN)
+        self.lbl_title.pack(side="top", anchor="w")
+        
+        env_text = self.model.env
+        #color = "#dc3545" if "PROD" in env_text else "#28a745" if "TEST" in env_text else "#ffc107"
+        self.lbl_env = ctk.CTkLabel(self.info_container, text=f"Environment: {env_text}", 
+                                   font=("Segoe UI", 12, "bold"), text_color="gray")
+        self.lbl_env.pack(side="top", anchor="w")
 
     def set_title(self, text):
         self.lbl_title.configure(text=text)
@@ -190,6 +253,8 @@ class DashboardView(ctk.CTkFrame):
 class SalesView(ctk.CTkFrame):
     def __init__(self, master, callbacks, mapping_templates, **kwargs):
         super().__init__(master, fg_color="transparent", **kwargs)
+        self.callbacks = callbacks
+        self.mapping_templates = mapping_templates
         
         BTN_COLOR = "#0066cc"
         BTN_HOVER = "#0052a3"
@@ -197,26 +262,32 @@ class SalesView(ctk.CTkFrame):
         self.toolbar = ctk.CTkFrame(self, height=60, fg_color="transparent")
         self.toolbar.pack(fill="x", padx=25, pady=(20, 15))
 
-        self.btn_import = ctk.CTkButton(self.toolbar, text="1. Import XLSX", command=callbacks['import'], corner_radius=8, width=120, fg_color=BTN_COLOR, hover_color=BTN_HOVER)
+        self.btn_import = ctk.CTkButton(self.toolbar, text="1. Import XLSX ▾", command=self.show_import_menu, 
+                                       corner_radius=8, width=140, fg_color=BTN_COLOR, hover_color=BTN_HOVER)
         self.btn_import.pack(side="left", padx=5)
 
-        self.btn_remove = ctk.CTkButton(self.toolbar, text="Usuń", command=callbacks['remove'], corner_radius=8, width=60, fg_color="#dc3545", hover_color="#c82333")
-        self.btn_remove.pack(side="left", padx=5)
+        
 
-        self.btn_generate = ctk.CTkButton(self.toolbar, text="2. Generuj XML", command=callbacks['generate'], corner_radius=8, width=120, fg_color=BTN_COLOR, hover_color=BTN_HOVER)
+        self.btn_generate = ctk.CTkButton(self.toolbar, text="2. Generate XML", command=callbacks['generate'], corner_radius=8, width=120, fg_color=BTN_COLOR, hover_color=BTN_HOVER)
         self.btn_generate.pack(side="left", padx=5)
 
-        self.btn_send = ctk.CTkButton(self.toolbar, text="3. Wyślij (KSeF)", command=callbacks['send_xml'], corner_radius=8, width=120, fg_color=BTN_COLOR, hover_color=BTN_HOVER)
+        self.btn_send = ctk.CTkButton(self.toolbar, text="3. Send (KSeF)", command=callbacks['send_xml'], corner_radius=8, width=120, fg_color=BTN_COLOR, hover_color=BTN_HOVER)
         self.btn_send.pack(side="left", padx=5)
 
-        self.btn_upo = ctk.CTkButton(self.toolbar, text="UPO", command=callbacks['check_upo'], corner_radius=8, width=60, fg_color="#6c757d", hover_color="#5a6268")
+        self.btn_upo = ctk.CTkButton(self.toolbar, text="Download UPO", command=callbacks['check_upo'], corner_radius=8, width=60, fg_color="#6c757d", hover_color="#5a6268")
         self.btn_upo.pack(side="left", padx=5)
 
-        self.btn_viz = ctk.CTkButton(self.toolbar, text="Podgląd", command=callbacks['preview'], corner_radius=8, width=80, fg_color="#17a2b8", hover_color="#138496")
+        self.btn_viz = ctk.CTkButton(self.toolbar, text="Create PDF Preview", command=callbacks['preview'], corner_radius=8, width=80, fg_color="#17a2b8", hover_color="#138496")
         self.btn_viz.pack(side="left", padx=5)
 
-        self.combo_mapping = ctk.CTkOptionMenu(self.toolbar, values=mapping_templates, width=200, corner_radius=8)
-        self.combo_mapping.pack(side="right", padx=5)
+        self.btn_remove = ctk.CTkButton(self.toolbar, text="Clear Data", command=callbacks['remove'], corner_radius=8, fg_color="#dc3545", hover_color="#c82333")
+        self.btn_remove.pack(side="right", padx=5)
+
+        # Menu dla przycisku importu (zamiast combo_mapping)
+        self.import_menu = tk.Menu(self, tearoff=0, font=("Segoe UI", 10), bg="white", fg="black", activebackground=BTN_COLOR)
+        for template in mapping_templates:
+            self.import_menu.add_command(label=f"Szablon: {template}", 
+                                         command=lambda t=template: self.callbacks['import'](t))
 
         self.table_container = ctk.CTkFrame(self, corner_radius=10, border_width=1, border_color=("gray85", "gray20"))
         self.table_container.pack(fill="both", expand=True, padx=30, pady=10)
@@ -247,7 +318,7 @@ class SalesView(ctk.CTkFrame):
         }
         
         for col, title in headers.items():
-            self.tree.heading(col, text=title)
+            self.tree.heading(col, text=title, command=lambda c=col: self.sort_column(c, False))
             
         # Column Configuration (Widths)
         self.tree.column("status", width=100, anchor="center", stretch=False)
@@ -290,6 +361,35 @@ class SalesView(ctk.CTkFrame):
         self.table_container.grid_rowconfigure(0, weight=1)
         self.table_container.grid_columnconfigure(0, weight=1)
 
+    def show_import_menu(self):
+        # Wyświetl menu pod przyciskiem
+        x = self.btn_import.winfo_rootx()
+        y = self.btn_import.winfo_rooty() + self.btn_import.winfo_height()
+        self.import_menu.post(x, y)
+
+    def sort_column(self, col, reverse):
+        """Sorts treeview content when a column header is clicked."""
+        l = [(self.tree.set(k, col), k) for k in self.tree.get_children('')]
+        
+        # Try numeric sort for amount columns
+        if col in ["net", "vat", "gross"]:
+            try:
+                l.sort(key=lambda t: float(t[0].replace(',', '.')), reverse=reverse)
+            except (ValueError, AttributeError):
+                l.sort(reverse=reverse)
+        else:
+            l.sort(reverse=reverse)
+
+        # Rearrange items in sorted order
+        for index, (val, k) in enumerate(l):
+            self.tree.move(k, '', index)
+            # Re-apply zebra tags after moving
+            tag = 'even' if index % 2 == 0 else 'odd'
+            self.tree.item(k, tags=(tag,))
+
+        # Reverse sort next time
+        self.tree.heading(col, command=lambda: self.sort_column(col, not reverse))
+
     def update_table(self, data_list):
         """
         data_list: List of tuples matching the columns
@@ -304,15 +404,42 @@ class SalesView(ctk.CTkFrame):
         if not data_list:
             return
 
-        # Insert new
+        # Insert new (cleaning newlines for visibility)
         for i, row in enumerate(data_list):
             tag = 'even' if i % 2 == 0 else 'odd'
-            self.tree.insert("", "end", values=row, tags=(tag,))
+            # Clean newlines from all cells to prevent row overlap
+            row_clean = tuple(str(x).replace('\n', ' ').strip() if x is not None else "" for x in row)
+            self.tree.insert("", "end", values=row_clean, tags=(tag,))
         
         # Zebra striping
         row_even, row_odd = setup_treeview_styles() # Get colors
         self.tree.tag_configure('even', background=row_even)
         self.tree.tag_configure('odd', background=row_odd)
+
+        if data_list:
+            self._autofit_columns()
+
+    def _autofit_columns(self):
+        """Automatically adjusts column widths based on content."""
+        f = font.Font(family="Segoe UI", size=11)
+        for col in self.columns:
+            # Measure header
+            header_text = self.tree.heading(col)['text']
+            max_w = f.measure(header_text) + 25
+            
+            # Measure items (first 100)
+            for item in self.tree.get_children()[:100]:
+                val = str(self.tree.set(item, col))
+                w = f.measure(val) + 20
+                if w > max_w:
+                    max_w = w
+            
+            if max_w > 500: max_w = 500
+            if max_w < 50: max_w = 50
+            
+            # Allow 'p2_name' (Nabywca) to stretch
+            is_stretch = (col == "p2_name")
+            self.tree.column(col, width=max_w, minwidth=max_w, stretch=is_stretch)
 
 class PurchasesView(ctk.CTkFrame):
     def __init__(self, master, callbacks, **kwargs):
@@ -365,13 +492,12 @@ class PurchasesView(ctk.CTkFrame):
         self.lbl_days_val.pack(side="left", padx=(5, 0))
 
         # Action buttons (Fetch & Export)
-        self.btn_sync = ctk.CTkButton(self.toolbar, text="Fetch from KSeF", command=callbacks['sync'], corner_radius=8, fg_color=BTN_COLOR, hover_color=BTN_HOVER)
-        self.btn_sync.pack(side="right", padx=5)
+        self.btn_clear = ctk.CTkButton(self.toolbar, text="Clear Data", command=self.reset_table, corner_radius=8, fg_color="#dc3545", hover_color="#c82333")
+        self.btn_clear.pack(side="right", padx=5)
         self.btn_export = ctk.CTkButton(self.toolbar, text="Export to Excel", command=callbacks['export'], corner_radius=8, fg_color=BTN_COLOR, hover_color=BTN_HOVER)
         self.btn_export.pack(side="right", padx=5)
-
-        self.btn_clear = ctk.CTkButton(self.toolbar, text="Clear Data", command=self.reset_table, corner_radius=8, fg_color="gray30", hover_color="gray25")
-        self.btn_clear.pack(side="right", padx=5)
+        self.btn_sync = ctk.CTkButton(self.toolbar, text="Fetch from KSeF", command=callbacks['sync'], corner_radius=8, fg_color=BTN_COLOR, hover_color=BTN_HOVER)
+        self.btn_sync.pack(side="right", padx=5)
 
         # Container for Treeview
         self.table_frame = ctk.CTkFrame(self, corner_radius=10, border_width=1, border_color=("gray85", "gray20"))
@@ -430,14 +556,37 @@ class PurchasesView(ctk.CTkFrame):
         if not data_list:
             return
 
-        # Insert new data
+        # Insert new data (cleaning newlines)
         for i, row in enumerate(data_list):
             tag = 'even' if i % 2 == 0 else 'odd'
-            self.tree.insert("", "end", values=row, tags=(tag,))
+            row_clean = tuple(str(x).replace('\n', ' ').strip() if x is not None else "" for x in row)
+            self.tree.insert("", "end", values=row_clean, tags=(tag,))
         
         # Zebra striping - Dynamically set colors
         self.tree.tag_configure('even', background=row_even)
         self.tree.tag_configure('odd', background=row_odd)
+
+        if data_list:
+            self._autofit_columns()
+
+    def _autofit_columns(self):
+        """Automatically adjusts column widths based on content."""
+        f = font.Font(family="Segoe UI", size=11)
+        for col in self.columns:
+            header_text = self.tree.heading(col)['text']
+            max_w = f.measure(header_text) + 25
+            for item in self.tree.get_children()[:100]:
+                val = str(self.tree.set(item, col))
+                w = f.measure(val) + 20
+                if w > max_w:
+                    max_w = w
+            
+            if max_w > 500: max_w = 500
+            if max_w < 50: max_w = 50
+            
+            # Allow 'name' column to stretch to fill remaining space
+            is_stretch = (col == "name")
+            self.tree.column(col, width=max_w, minwidth=max_w, stretch=is_stretch)
 
     def refresh_theme(self):
         """Refreshes the table colors without reloading data."""
@@ -489,7 +638,7 @@ class KSeFViewV4(ctk.CTk):
         self.grid_rowconfigure(0, weight=0)
         self.grid_rowconfigure(1, weight=1)
 
-        self.sidebar = Sidebar(self, callbacks, width=SIDEBAR_WIDTH, env=model.config.version)
+        self.sidebar = Sidebar(self, callbacks, model, width=SIDEBAR_WIDTH)
         self.sidebar.grid(row=0, column=0, rowspan=2, sticky="nsew")
 
         self.header = TopHeader(self, model)

@@ -1,5 +1,9 @@
-import time
 import os
+import time
+import datetime
+import logging
+import sys
+from logging.handlers import TimedRotatingFileHandler
 from ksef_client.utils.ksefconfig import Config
 from ksef_client.services.auth_service import AuthService
 from ksef_client.services.invoice_service import InvoiceService
@@ -11,12 +15,31 @@ except ImportError:
     TemplateMapper = None
     print("Warning: Could not import standalone_mapper. Excel loading will fail.")
 
+class LogStream:
+    """Pośrednik przekierowujący dane z terminala (stdout/stderr) do loggera."""
+    def __init__(self, logger, log_level):
+        self.logger = logger
+        self.log_level = log_level
+        self.linebuf = ''
+
+    def write(self, buf):
+        for line in buf.rstrip().splitlines():
+            self.logger.log(self.log_level, line.rstrip())
+
+    def flush(self):
+        pass
+
 class KSeFModel:
     def __init__(self):
         # Inicjalizacja konfiguracji (domyślnie firma 1, osoba fizyczna = False)
         # W przyszłości można dodać ekran wyboru profilu w GUI
         self.config = Config(1, initialize=True)
-        # Bridge backend logs to GUI console
+        
+        # --- KONFIGURACJA LOGOWANIA ---
+        self.logs = []
+        self._setup_logging()
+        
+        # Bridge backend logs to GUI console (via config)
         self.config.log_callback = self.log
         
         self.auth_service = AuthService(self.config)
@@ -27,6 +50,8 @@ class KSeFModel:
         self.session_token = None
         self.token_expiry = 0 # Timestamp wygaśnięcia
         self.user_name = f"Dawid ({self.config.nip})"
+        self.app_version = self.config.app_version
+        self.env = self.config.version.upper()
         self.last_operation = "System gotowy"
         
         # Dane faktur (początkowo puste, pobierane z serwisu)
@@ -39,15 +64,67 @@ class KSeFModel:
             "ACC_MULTI",
             "ACC_EUR"
         ]
+
+    def _setup_logging(self):
+        """Konfiguracja logowania z datą w nazwie i ręcznym czyszczeniem starych logów."""
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        log_file = self.config.logs / f"app_{today}.log"
         
-        self.logs = []
+        # 1. RĘCZNE CZYSZCZENIE STARYCH LOGÓW (starszych niż 30 dni)
+        try:
+            now = time.time()
+            retention_days = 90
+            for f in os.listdir(self.config.logs):
+                f_path = os.path.join(self.config.logs, f)
+                if os.path.isfile(f_path) and f.startswith("app_") and f.endswith(".log"):
+                    # Jeśli plik jest starszy niż 30 dni
+                    if os.stat(f_path).st_mtime < now - (retention_days * 86400):
+                        os.remove(f_path)
+        except Exception as e:
+            print(f"Błąd podczas czyszczenia logów: {e}")
+
+        # 2. KONFIGURACJA LOGGERA
+        self.logger = logging.getLogger("KSeFApp")
+        self.logger.setLevel(logging.DEBUG)
+        
+        file_formatter = logging.Formatter('%(asctime)s [%(levelname)s] [%(name)s] %(message)s')
+        
+        # Używamy standardowego FileHandler, bo data jest już w nazwie
+        file_handler = logging.FileHandler(log_file, encoding='utf-8')
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(file_formatter)
+        
+        # Unikaj duplikowania handlerów
+        if not self.logger.handlers:
+            self.logger.addHandler(file_handler)
+            
+            # --- PRZECHWYTYWANIE TERMINALA ---
+            sys.stdout = LogStream(self.logger, logging.INFO)
+            sys.stderr = LogStream(self.logger, logging.ERROR)
+            
+            self.logger.info(f"--- Logowanie zainicjowane (Plik: {log_file.name}) ---")
 
     def log(self, message, level="INFO"):
-        timestamp = time.strftime('%H:%M:%S')
-        log_entry = f"[{timestamp}] [{level}] {message}"
-        self.logs.append(log_entry)
-        self.last_operation = message
-        return log_entry
+        """
+        Loguje komunikat do pliku i (jeśli poziom >= INFO) do konsoli GUI.
+        """
+        # 1. Zapis do systemowego loggera (do pliku)
+        numeric_level = getattr(logging, level.upper(), logging.INFO)
+        
+        # Jeśli logujemy błąd, automatycznie dołączamy informacje o wyjątku (traceback)
+        if numeric_level >= logging.ERROR:
+            self.logger.log(numeric_level, message, exc_info=True)
+        else:
+            self.logger.log(numeric_level, message)
+        
+        # 2. Przekazanie do konsoli GUI (tylko INFO, WARNING, ERROR, CRITICAL)
+        if numeric_level >= logging.INFO:
+            timestamp = time.strftime('%H:%M:%S')
+            log_entry = f"[{timestamp}] [{level}] {message}"
+            self.logs.append(log_entry)
+            self.last_operation = message
+            return log_entry
+        return None
 
     def init_system(self):
         """Fetch KSeF certificates (v2 init)."""
@@ -55,10 +132,10 @@ class KSeFModel:
         try:
             self.auth_service.fetch_certificates()
             self.config.reload_certificates() # Force memory refresh
-            self.log("✅ Certificates fetched successfully.")
+            self.log("Certificates fetched successfully.")
             return True
         except Exception as e:
-            self.log(f"❌ Initialization error: {str(e)}", "ERROR")
+            self.log(f"Initialization error: {str(e)}", "ERROR")
             return False
 
     def open_session(self):
@@ -80,10 +157,10 @@ class KSeFModel:
             # KSeF session lasts usually 1 hour (3600s)
             self.token_expiry = time.time() + 3500 
             
-            self.log(f"✅ Session opened correctly. Ref: {ref_no}")
+            self.log(f"Session opened correctly. Ref: {ref_no}")
             return True
         except Exception as e:
-            self.log(f"❌ Login error: {str(e)}", "ERROR")
+            self.log(f"Login error: {str(e)}", "ERROR")
             return False
 
     def check_session_status(self):
@@ -92,7 +169,7 @@ class KSeFModel:
             status = self.invoice_service.session.get('referenceNumber')
             if status:
                 self.is_logged_in = True
-                self.log(f"✅ Session active: {status}")
+                self.log(f"Session active: {status}")
             else:
                 self.is_logged_in = False
                 self.log("No active session.")
@@ -105,10 +182,10 @@ class KSeFModel:
         self.log("Refreshing session token...")
         try:
             self.auth_service.refresh_token()
-            self.log("✅ Token refreshed.")
+            self.log("Token refreshed.")
             return True
         except Exception as e:
-            self.log(f"❌ Refresh error: {str(e)}", "ERROR")
+            self.log(f"Refresh error: {str(e)}", "ERROR")
             return False
 
     def logout(self):
@@ -120,14 +197,14 @@ class KSeFModel:
             self.log("Logged out safely.")
             return True
         except Exception as e:
-            self.log(f"❌ Logout error: {str(e)}", "ERROR")
+            self.log(f"Logout error: {str(e)}", "ERROR")
             return False
 
     def load_excel_preview(self, excel_path, template):
         self.log(f"Loading Excel preview: {excel_path} ({template})...")
         
         if not TemplateMapper:
-            self.log("❌ Error: TemplateMapper module not available.", "ERROR")
+            self.log("Error: TemplateMapper module not available.", "ERROR")
             return None
             
         try:
@@ -135,21 +212,21 @@ class KSeFModel:
             rules_path = os.path.join(self.config.resources_dir, "technical_rules.json")
             
             if not os.path.exists(rules_path):
-                self.log(f"❌ Error: Rules file not found at {rules_path}", "ERROR")
+                self.log(f"Error: Rules file not found at {rules_path}", "ERROR")
                 return None
                 
             mapper = TemplateMapper(rules_path)
             data = mapper.extract_data(excel_path, template)
             
             if data['status'] == "BŁĄD":
-                self.log(f"❌ Extraction failed for {excel_path}", "ERROR")
+                self.log(f"Extraction failed for {excel_path}", "ERROR")
             else:
-                self.log(f"✅ Loaded data for {excel_path}")
+                self.log(f"Loaded data for {excel_path}")
                 
             return data
             
         except Exception as e:
-            self.log(f"❌ Load error: {str(e)}", "ERROR")
+            self.log(f"Load error: {str(e)}", "ERROR")
             return None
 
     def generate_xml_from_file(self, excel_path, template):
@@ -166,34 +243,34 @@ class KSeFModel:
             output_xml = excel_path.replace('.xlsx', '_mapped.xml')
             generated_path = mapper.create_xml(excel_path, output_xml, mapping_type=template)
             
-            self.log(f"✅ Generated: {os.path.basename(generated_path)}")
+            self.log(f"Generated: {os.path.basename(generated_path)}")
             return generated_path
             
         except Exception as e:
-            self.log(f"❌ Generation error: {str(e)}", "ERROR")
+            self.log(f"Generation error: {str(e)}", "ERROR")
             return None
 
     def send_xml_invoice(self, xml_path):
         if not self.is_logged_in:
-             self.log("❌ Error: You must be logged in to send an invoice.", "ERROR")
+             self.log("Error: You must be logged in to send an invoice.", "ERROR")
              return False
         self.log(f"Sending file {xml_path} (InvoiceService)...")
         try:
             ref_no = self.invoice_service.send_invoice(xml_path)
-            self.log(f"✅ Invoice sent. Ref: {ref_no}")
+            self.log(f"Invoice sent. Ref: {ref_no}")
             return True
         except Exception as e:
-            self.log(f"❌ Send error: {str(e)}", "ERROR")
+            self.log(f"Send error: {str(e)}", "ERROR")
             return False
 
     def check_status_upo(self, xml_path):
         self.log(f"Fetching status/UPO for XML file...")
         try:
             upo_path = self.invoice_service.download_upo(xml_path)
-            self.log(f"✅ UPO fetched and saved to: {upo_path}")
+            self.log(f"UPO fetched and saved to: {upo_path}")
             return True
         except Exception as e:
-            self.log(f"❌ Status error: {str(e)}", "ERROR")
+            self.log(f"Status error: {str(e)}", "ERROR")
             return False
 
     def fetch_purchases(self, days=30, subject_type="Subject2"):
@@ -245,15 +322,15 @@ class KSeFModel:
                 # Format for Treeview (nip, name, ksef_no, inv_no, date, net, gross, vat, currency)
                 self.purchase_invoices.append((nip, name, ksef, inv_no, date, net, gross, vat, curr))
             
-            self.log(f"✅ Fetched {len(self.purchase_invoices)} invoices.")
+            self.log(f"Fetched {len(self.purchase_invoices)} invoices.")
             return self.purchase_invoices
         except Exception as e:
-            self.log(f"❌ Fetch error: {str(e)}", "ERROR")
+            self.log(f"Fetch error: {str(e)}", "ERROR")
             return False
 
     def export_purchases_to_excel(self):
         if not hasattr(self, 'purchase_invoices_raw') or not self.purchase_invoices_raw:
-            self.log("⚠️ No data to export. Fetch invoices first.", "WARNING")
+            self.log("No data to export. Fetch invoices first.", "WARNING")
             return False
             
         self.log("Generating summary report from last fetch...")
@@ -265,8 +342,8 @@ class KSeFModel:
             subj_type = getattr(self, 'last_subject_type', 'Subject2')
             path = self.export_service.export_to_excel(self.purchase_invoices_raw, str(output_path), subject_type=subj_type)
             
-            self.log(f"✅ Report exported to: {path}")
+            self.log(f"Report exported to: {path}")
             return path
         except Exception as e:
-            self.log(f"❌ Export error: {str(e)}", "ERROR")
+            self.log(f"Export error: {str(e)}", "ERROR")
             return False

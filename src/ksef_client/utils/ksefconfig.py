@@ -25,6 +25,7 @@ class Config(configparser.ConfigParser):
         self.config_dir = self.project_root / 'config'
         self.storage_dir = self.project_root / 'storage'
         self.resources_dir = self.project_root / 'resources'
+        self.logs_dir = self.project_root / 'logs'
         
         # New structured storage paths
         self.sent_dir = self.storage_dir / 'sent'
@@ -33,7 +34,7 @@ class Config(configparser.ConfigParser):
         
         # Ensure directories exist
         dirs_to_create = [
-            self.config_dir, self.storage_dir, self.resources_dir,
+            self.config_dir, self.storage_dir, self.resources_dir, self.logs_dir,
             self.sent_dir / 'xml', self.sent_dir / 'upo', self.sent_dir / 'viz',
             self.received_dir / 'xml', self.received_dir / 'viz',
             self.reports_dir
@@ -50,6 +51,7 @@ class Config(configparser.ConfigParser):
         self.firma = firma
         self.osoba = osoba
         self.version = self.get('ksef', 'version', fallback='test')
+        self.app_version = self.get('ksef', 'app_version', fallback='1.0')
         self.proxy_enabled = self.getboolean('ksef', 'proxy_enabled', fallback=False)
         self.url = self.get(self.version, 'url')
         self.kseftoken = self.get(f'firma{firma}', 'token', fallback=None)
@@ -100,6 +102,8 @@ class Config(configparser.ConfigParser):
     def received_viz(self): return self.received_dir / 'viz'
     @property
     def reports(self): return self.reports_dir
+    @property
+    def logs(self): return self.logs_dir
 
     def loadcertificate(self, cert_data):
         from cryptography.hazmat.primitives import serialization
